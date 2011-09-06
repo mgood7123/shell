@@ -99,23 +99,14 @@ int run_cd(pipeline *scmd)
 	}
 }
 
-int change_redirection(pipeline *scmd, int *fd_origin,
-		int pipefd[], int input)
+int change_redirection(pipeline *scmd, int input)
 {
 	int flags, fd;
-	int fd_origin_num = input ? 0 : 1;
+	int fd_origin_num = input ? STDIN_FILENO : STDOUT_FILENO;
 	char *file = input ? scmd->input : scmd->output;
-
-#ifdef DEBUG_RUNNER
-	printf("{%d, %d}\n", pipefd[0], pipefd[1]);
-#endif
 
 	/* need redirection? */
 	if (file == NULL)
-		return 0;
-	if (input && pipefd[0] >= 0)
-		return 0;
-	if (!input && pipefd[1] >= 0)
 		return 0;
 
 	/* change flags */
@@ -139,8 +130,10 @@ int change_redirection(pipeline *scmd, int *fd_origin,
 		return NOT_RUNNED;
 	}
 
-	 /* save copy */
+	 /* save copy */ /* not need if in clild process
 	if_true_return((*fd_origin = dup(fd_origin_num)) < 0);
+	*/
+
 	/* duplicate a file descriptor */
 	dup2_or_return(fd, fd_origin_num);
 	/* close file descriptor */
@@ -151,7 +144,7 @@ int change_redirection(pipeline *scmd, int *fd_origin,
 
 int unchange_redirection(int fd, int input)
 {
-	int fd_origin_num = input ? 0 : 1;
+	int fd_origin_num = input ? STDIN_FILENO : STDOUT_FILENO;
 
 	/* need unchange? */
 	if (fd < 0)
@@ -164,14 +157,9 @@ int unchange_redirection(int fd, int input)
 	return 0;
 }
 
-int run_simple_command(pipeline *scmd, int background,
-		int pgid, int pipefd[])
+int run_simple_command(pipeline *scmd, int *pid, int pgid)
 {
 	char *file;
-	pid_t pid;
-	int status = 0;
-	int fd_in = -1;
-	int fd_out = -1;
 
 /* Need?
 	if (scmd == NULL
@@ -183,53 +171,36 @@ int run_simple_command(pipeline *scmd, int background,
 
 	file = *(scmd->argv);
 
-	if (change_redirection(scmd, &fd_in, pipefd, 1) != 0
-		|| change_redirection(scmd, &fd_out, pipefd, 0) != 0)
-		return NOT_RUNNED;
+	if (!strcmp(file, "cd"))
+		return run_cd(scmd);
 
-	if (!strcmp(file, "cd")) {
-		status = run_cd(scmd);
-		if (unchange_redirection(fd_in, 1) != 0
-			|| unchange_redirection(fd_out, 0) != 0)
-			return FAILED;
-		return status;
-	}
+	*pid = fork();
 
-	pid = fork();
-	if (pid == -1) {
+	if (*pid == -1) {
 		perror("fork()");
 		return NOT_RUNNED;
-	} else if (pid == 0) {
-		if_non_zero_exit(setpgid(0, 0/*pgid*/)); /* tmp */
+	} else if (*pid == 0) {
+		if_non_zero_exit(setpgid(TERM_DESC, pgid));
+		if_non_zero_exit(change_redirrection(scmd, 0));
+		if_non_zero_exit(change_redirrection(scmd, 1));
+		set_sig_dfl();
 		execvp(file, scmd->argv);
 		perror("execvp");
 		exit(1);
 	}
 
-	if (!background) {
-		tcsetpgrp(0, pid/*pgid*/); /* tmp */
-
-		waitpid(pid, &status, WUNTRACED);
-
-		signal(SIGTTOU, SIG_IGN);
-		tcsetpgrp(0, getpgrp());
-		signal(SIGTTOU, SIG_DFL);
-	}
-
-	if (unchange_redirection(fd_in, 1) != 0
-		|| unchange_redirection(fd_out, 0) != 0)
-		return FAILED;
-
-	return status;
+	return 0;
 }
 
 int run_pipeline(pipeline *pl, int background)
 {
 	int status = NOT_RUNNED;
 	int pipefd[] = {-1, -1};
-	int pgid = getpgrp();
-	int in_origin = dup(0);
-	int out_origin = dup(1);
+	int pgid = -1;
+	int in_origin = dup(STDIN_FILENO);
+	int out_origin = dup(STDOUT_FILENO);
+	int fd_in = STDIN_FILENO;
+	int fd_out = STDOUT_FILENO;
 
 	while (pl) {
 		int redirect_in = (status != NOT_RUNNED);
@@ -237,7 +208,8 @@ int run_pipeline(pipeline *pl, int background)
 
 		/* redirect from pipe to input */
 		if (redirect_in) {
-			dup2_or_return(pipefd[0], 0);
+			pl->input = NULL;
+			dup2_or_return(pipefd[0], STDIN_FILENO);
 			close_or_return(pipefd[0]);
 		} else
 			pipefd[0] = -1;
@@ -251,7 +223,8 @@ int run_pipeline(pipeline *pl, int background)
 
 		/* redirect output to pipe */
 		if (redirect_out) {
-			dup2_or_return(pipefd[1], 1);
+			pl->output = NULL;
+			dup2_or_return(pipefd[1], STDOUT_FILENO);
 			close_or_return(pipefd[1]);
 		} else { /* if (pipefd[1] >= 0) {*/
 			close_or_return(1);
@@ -259,8 +232,7 @@ int run_pipeline(pipeline *pl, int background)
 			pipefd[1] = -1;
 		}
 
-		status = run_simple_command(pl, redirect_out || background,
-					pgid, pipefd);
+		status = run_simple_command(pl, &pid, pgid);
 
 		/* close previous read pipe
 		 * TODO: make whew cmd dead
@@ -276,10 +248,24 @@ int run_pipeline(pipeline *pl, int background)
 	}
 
 	if (pipefd[0] >= 0) {
-		close_or_return(0);
-		dup2_or_return(in_origin, 0);
+		close_or_return(STDIN_FILENO);
+		dup2_or_return(in_origin, STDIN_FILENO);
 		pipefd[0] = -1;
 	}
+
+	if (!background) {
+		tcsetpgrp(SHELL_DESC, pgid);
+
+		waitpid(pid, &status, WUNTRACED);
+
+		/*signal(SIGTTOU, SIG_IGN);*/
+		tcsetpgrp(SHELL_DESC, shell_pgid);
+		/*signal(SIGTTOU, SIG_DFL);*/
+	}
+
+	if (unchange_redirection(fd_in, 1) != 0
+		|| unchange_redirection(fd_out, 0) != 0)
+		return FAILED;
 
 	return status;
 }

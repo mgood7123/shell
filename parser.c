@@ -293,9 +293,9 @@ void change_in_out(rState *s, pipeline *scmd,
 			scmd->append = append;
 		}
 		s->str_need = 1;
-	}
-	else
+	} else {
 		set_error(s);
+	}
 }
 
 /* Type of current token must be TKN_OTHER */

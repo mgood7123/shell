@@ -30,4 +30,6 @@ typedef struct command {
 #define DEBUG_RUNNER
 */
 
+#define TERM_DESC STDIN_FILENO
+
 #endif

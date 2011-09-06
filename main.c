@@ -9,8 +9,39 @@
 #include <string.h>
 
 char **global_envp;
+pid_t shell_pgid;
 
-void init_envp(char **envp)
+void set_sig_ign(void)
+{
+	signal(SIGINT, SIG_IGN);
+	signal(SIGQUIT, SIG_IGN);
+	signal(SIGTSTP, SIG_IGN);
+	signal(SIGTTIN, SIG_IGN);
+	signal(SIGTTOU, SIG_IGN);
+	signal(SIGCHLD, SIG_IGN);
+}
+
+void set_sig_dfl(void)
+{
+	signal(SIGINT, SIG_DFL);
+	signal(SIGQUIT, SIG_DFL);
+	signal(SIGTSTP, SIG_DFL);
+	signal(SIGTTIN, SIG_DFL);
+	signal(SIGTTOU, SIG_DFL);
+	signal(SIGCHLD, SIG_DFL);
+}
+
+/* Shell initialization:
+ * save envp;
+ * set PWD enviroment variable;
+ * change umask;
+ * ignore some signals;
+ * get shell group id
+ * put shell group to foreground */
+
+/* Note: this is not check for
+ * interactively/background runned shell. */
+void init_shell(char **envp)
 {
 	char *pwd;
 
@@ -21,6 +52,11 @@ void init_envp(char **envp)
 	free(pwd);
 
 	umask(S_IWGRP | S_IWOTH);
+
+	set_sig_ign();
+
+	shell_pgid = getpid();
+	tcsetpgrp(STDIN_FILENO, shell_pgid);
 }
 
 void print_prompt1(void)
@@ -68,9 +104,11 @@ void print_prompt2(void)
 void print_set()
 {
 	char **envp = global_envp;
-	if (envp)
-		while (*envp)
-			printf("%s\n", *(envp++));
+	if (!envp)
+		return;
+
+	while (*envp)
+		printf("%s\n", *(envp++));
 }
 
 int main(int argc, char **argv, char **envp)
