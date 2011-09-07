@@ -9,49 +9,6 @@
 #include <fcntl.h>
 #include <string.h>
 
-#define NOT_RUNNED -1
-#define FAILED -2
-
-#define dup2_or_return(fd1, fd2); \
-do {\
-	if (dup2(fd1, fd2) < 0) {\
-		perror("dup2");\
-		return NOT_RUNNED;\
-	} \
-} while (0);
-
-#define close_or_return(fd); \
-do {\
-	if (close(fd)) {\
-		perror("close");\
-		return NOT_RUNNED;\
-	} \
-} while (0);
-
-#define if_true_return(var); \
-do {\
-	if ((var)) {\
-		perror(#var);\
-		return NOT_RUNNED;\
-	} \
-} while (0);
-
-#define if_zero_return(var); \
-do {\
-	if (!(var)) {\
-		perror(#var);\
-		return NOT_RUNNED;\
-	} \
-} while (0);
-
-#define if_non_zero_exit(var); \
-do {\
-	if ((var)) {\
-		perror(#var);\
-		exit(1);\
-	} \
-} while (0);
-
 int cd_to_path(char *str)
 {
 	int status = chdir(str);
@@ -74,7 +31,7 @@ char *cd_to_var(char *varname)
 	char *var = getenv(varname);
 
 	if (!var) {
-		printf("%s %s %s\n", "Variable", varname, "is unset!");
+		printf("Variable %s is unset!\n", varname);
 		return NULL;
 	}
 
@@ -157,117 +114,95 @@ int unchange_redirection(int fd, int input)
 	return 0;
 }
 
-int run_simple_command(pipeline *scmd, int *pid, int pgid)
+/* set process group ID
+ * set controlling terminal options
+ * set job control signals to SIG_DFL
+ * exec */
+void launch_process(process *p, pid_t pgid, int foreground)
 {
-	char *file;
+    if (shell_interactive) {
+        /* set process group ID
+         * (0 mean calling process ID) */
+        /* we must make it before tcsetpgrp */
+        if (setpgid(0, pgid)) {
+            perror("(In child process) setpgid");
+        }
 
-/* Need?
-	if (scmd == NULL
-	|| scmd->file == NULL
-	|| scmd->argv == NULL
-	|| *(scmd->argv) == NULL)
-		return NOT_RUNNED;
-*/
+        /* we must make in before execvp */
+        if (foreground && tcsetpgrp(TERM_DESC, pgid)) {
+            perror("(In child process) tcsetpgrp");
+        }
 
-	file = *(scmd->argv);
-
-	if (!strcmp(file, "cd"))
-		return run_cd(scmd);
-
-	*pid = fork();
-
-	if (*pid == -1) {
-		perror("fork()");
-		return NOT_RUNNED;
-	} else if (*pid == 0) {
-		if_non_zero_exit(setpgid(TERM_DESC, pgid));
-		if_non_zero_exit(change_redirrection(scmd, 0));
-		if_non_zero_exit(change_redirrection(scmd, 1));
-		set_sig_dfl();
-		execvp(file, scmd->argv);
-		perror("execvp");
-		exit(1);
-	}
-
-	return 0;
+        set_sig_dfl();
+    }
+    /* TODO: dup2 && close for redirections */
+    execvp(*(p->argv), p->argv);
+    perror("(In child process) execvp");
+    exit(1);
 }
 
-int run_pipeline(pipeline *pl, int background)
+void launch_job(job *j, int foreground)
 {
-	int status = NOT_RUNNED;
-	int pipefd[] = {-1, -1};
-	int pgid = -1;
-	int in_origin = dup(STDIN_FILENO);
-	int out_origin = dup(STDOUT_FILENO);
-	int fd_in = STDIN_FILENO;
-	int fd_out = STDOUT_FILENO;
+    process *p;
+    pid_t fork_value;
 
-	while (pl) {
-		int redirect_in = (status != NOT_RUNNED);
-		int redirect_out = (pl->next != NULL);
+    for (p = j->first_process; p; p = p->next) {
+        /* TODO: resolve pipes and redirections */
+        fork_value = fork();
 
-		/* redirect from pipe to input */
-		if (redirect_in) {
-			pl->input = NULL;
-			dup2_or_return(pipefd[0], STDIN_FILENO);
-			close_or_return(pipefd[0]);
-		} else
-			pipefd[0] = -1;
+        if (fork_value < 0) {
+            perror("fork");
+            exit(1); // return?
+        }
 
-		/* new pipe */
-		if (redirect_in || redirect_out)
-			if (pipe(pipefd) != 0) {
-				perror("pipe()");
-				return NOT_RUNNED;
-			}
+        /* set p->pid ang pgid for both processes */
+        if (shell_interactive) {
+            if (fork_value) {
+                /* shell process */
+                p->pid = fork_value;
+            } else {
+                /* child process */
+                p->pid = getpid();
+            }
 
-		/* redirect output to pipe */
-		if (redirect_out) {
-			pl->output = NULL;
-			dup2_or_return(pipefd[1], STDOUT_FILENO);
-			close_or_return(pipefd[1]);
-		} else { /* if (pipefd[1] >= 0) {*/
-			close_or_return(1);
-			dup2_or_return(out_origin, 1);
-			pipefd[1] = -1;
-		}
+            if (p == j->first_process) {
+                j->pgid = p->pid;
+            }
+        }
 
-		status = run_simple_command(pl, &pid, pgid);
+        if (fork_value == 0) {
+            /* child process */
+            launch_process(p, j->pgid, foreground);
+        }
 
-		/* close previous read pipe
-		 * TODO: make whew cmd dead
-		if (pipefd[0] >= 0)
-			close_or_return(0);*/
+        /* parent process */
 
-		if (status != 0)
-			break;
-		pl = pl->next;
-#ifdef DEBUG_RUNNER
-		fprintf(stderr, "{%d, %d}\n", pipefd[0], pipefd[1]);
-#endif
-	}
+        if (shell_interactive) {
+            /* set process group ID
+             * we must make it before tcsetpgrp
+             * for job (after this for) */
+            if (setpgid(p->pid, j->pgid)) {
+                perror("(In child process) setpgid");
+            }
+        }
 
-	if (pipefd[0] >= 0) {
-		close_or_return(STDIN_FILENO);
-		dup2_or_return(in_origin, STDIN_FILENO);
-		pipefd[0] = -1;
-	}
+        /* TODO: unset redirections */
+    } /* for */
 
-	if (!background) {
-		tcsetpgrp(SHELL_DESC, pgid);
-
-		waitpid(pid, &status, WUNTRACED);
-
-		/*signal(SIGTTOU, SIG_IGN);*/
-		tcsetpgrp(SHELL_DESC, shell_pgid);
-		/*signal(SIGTTOU, SIG_DFL);*/
-	}
-
-	if (unchange_redirection(fd_in, 1) != 0
-		|| unchange_redirection(fd_out, 0) != 0)
-		return FAILED;
-
-	return status;
+    if (shell_interactive) {
+        if (foreground) {
+            tcsetpgrp(p->pid, j->pgid);
+            wait_for_job(j);
+            /* come back terminal permission
+            (0 mean calling process group ID) */
+            tcsetpgrp(TERM_DESC, 0);
+            /* TODO: setattr */
+        }
+        /* if background do nothing */
+    } else {
+        /* not interactive */
+        wait_for_job(j);
+    }
 }
 
 int run_command(command *cmd)
