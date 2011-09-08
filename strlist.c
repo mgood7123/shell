@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-char *new_str_block(int block_size)
+char *new_str_block(unsigned int block_size)
 {
 	if (block_size > 0)
 		return (char *) malloc(sizeof(char) * block_size);
@@ -12,7 +12,7 @@ char *new_str_block(int block_size)
 		return NULL;
 }
 
-strlist *new_strlist(int block_size)
+strlist *new_strlist(unsigned int block_size)
 {
 	strlist *list = (strlist *) malloc(sizeof(strlist));
 	list->str = new_str_block(block_size);
@@ -28,14 +28,14 @@ void add_to_strlist(strlist **list, char *str)
 		return;
 
 	if (*list == NULL) {
-		*list = new_strlist(-1);
+		*list = new_strlist(0);
 		(*list)->str = str;
 		return;
 	}
 
 	while (cur_item->next)
 		cur_item = cur_item->next;
-	cur_item->next = new_strlist(-1);
+	cur_item->next = new_strlist(0);
 	cur_item->next->str = str;
 }
 
@@ -104,7 +104,7 @@ void dispose_strlist(strlist *list, int dispose_string)
 }
 
 /*
-int length_strlist(strlist *list, int block_size)
+int length_strlist(strlist *list, unsigned int block_size)
 {
 	strlist *cur_item = list;
 	int count = 0;
@@ -113,7 +113,7 @@ int length_strlist(strlist *list, int block_size)
 		return 0;
 
 	while (cur_item->next) {
-		if (block_size < 0)
+		if (block_size == 0)
 			block_size = strlen(cur_item->str);
 		count += block_size;
 		cur_item = cur_item->next;
@@ -124,7 +124,7 @@ int length_strlist(strlist *list, int block_size)
 }
 */
 
-char *strlist_to_str(strlist *list, int block_size,
+char *strlist_to_str(strlist *list, unsigned int block_size,
 		int count_sym, int dispose_structure)
 {
 	strlist *cur_item = list;
@@ -137,7 +137,7 @@ char *strlist_to_str(strlist *list, int block_size,
 
 	while (cur_item->next) {
 		strlist *tmp = cur_item;
-		if (block_size < 0) /* for strings different length */
+		if (block_size == 0) /* for strings different length */
 			block_size = strlen(cur_item->str);
 		memcpy(cur_sym, cur_item->str, block_size);
 		cur_sym += block_size;
@@ -156,4 +156,14 @@ char *strlist_to_str(strlist *list, int block_size,
 	}
 
 	return str;
+}
+
+strlist_ext *new_strlist_ext(unsigned int block_size)
+{
+	strlist_ext *e =
+        (strlist_ext *) malloc(sizeof(strlist_ext));
+    e->strlist = new_strlist(block_size);
+    e->count_sym = 0;
+    e->block_size = block_size;
+    return e;
 }
