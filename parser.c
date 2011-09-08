@@ -7,19 +7,19 @@
 #define BLOCK_SIZE 8
 #define REAL_BLOCK_SIZE (BLOCK_SIZE+1)
 
-#define TKN_NULL -1
-#define TKN_OTHER 0
-#define TKN_INPUT 1
-#define TKN_OUTPUT 2
-#define TKN_APPEND 3
-#define TKN_PIPELINE 4
-#define TKN_AND 5
-#define TKN_OR 6
-#define TKN_SEMICOLON 7
-#define TKN_OPEN 8
-#define TKN_CLOSE 9
-#define TKN_REVERSE 10
-#define TKN_BG 11
+#define TOKEN_NULL -1
+#define TOKEN_OTHER 0
+#define TOKEN_INPUT 1
+#define TOKEN_OUTPUT 2
+#define TOKEN_APPEND 3
+#define TOKEN_PIPELINE 4
+#define TOKEN_AND 5
+#define TOKEN_OR 6
+#define TOKEN_SEMICOLON 7
+#define TOKEN_OPEN 8
+#define TOKEN_CLOSE 9
+#define TOKEN_REVERSE 10
+#define TOKEN_BG 11
 
 #define if_not_null_free(pointer); \
 do {\
@@ -77,7 +77,7 @@ void set_error(rState *s)
 	/* set error flag && break all loops */
 	s->error = s->eoln = s->eow = 1;
 	if_not_null_free(s->cur_token);
-	s->token_type = TKN_NULL;
+	s->token_type = TOKEN_NULL;
 }
 
 void unset_error(rState *s)
@@ -112,7 +112,7 @@ void check_for_token(rState *s, char ch, int several_char)
 	if (s->p == ch || s->c == ch)
 		s->eow = several_char ? !(s->p == ch && s->c == ch) : 1;
 	if (several_char ? (s->p == ch && s->c != ch) : (s->p == ch))
-		s->token_type = TKN_NULL; /* type will be assigned later */
+		s->token_type = TOKEN_NULL; /* type will be assigned later */
 }
 
 void change_unquoting(rState *s)
@@ -173,30 +173,30 @@ void add_sym(rState *s)
 int token_type(char *str)
 {
 	if (str == NULL)
-		return TKN_NULL;
+		return TOKEN_NULL;
 	if (!strcmp(str, "<"))
-		return TKN_INPUT;
+		return TOKEN_INPUT;
 	if (!strcmp(str, ">"))
-		return TKN_OUTPUT;
+		return TOKEN_OUTPUT;
 	if (!strcmp(str, ">>"))
-		return TKN_APPEND;
+		return TOKEN_APPEND;
 	if (!strcmp(str, "|"))
-		return TKN_PIPELINE;
+		return TOKEN_PIPELINE;
 	if (!strcmp(str, "&&"))
-		return TKN_AND;
+		return TOKEN_AND;
 	if (!strcmp(str, "||"))
-		return TKN_OR;
+		return TOKEN_OR;
 	if (!strcmp(str, ";"))
-		return TKN_SEMICOLON;
+		return TOKEN_SEMICOLON;
 	if (!strcmp(str, "("))
-		return TKN_OPEN;
+		return TOKEN_OPEN;
 	if (!strcmp(str, ")"))
-		return TKN_CLOSE;
+		return TOKEN_CLOSE;
 	if (!strcmp(str, "`"))
-		return TKN_REVERSE;
+		return TOKEN_REVERSE;
 	if (!strcmp(str, "&"))
-		return TKN_BG;
-	return TKN_OTHER;
+		return TOKEN_BG;
+	return TOKEN_OTHER;
 }
 
 void get_next_token(rState *s)
@@ -208,12 +208,12 @@ void get_next_token(rState *s)
 
 	s->count_sym = 1; /* 0 + one for '\0' */
 	s->cur_token = NULL;
-	s->token_type = TKN_OTHER;
+	s->token_type = TOKEN_OTHER;
 	s->str_need = 0;
 
 	skip_spaces(s);
 	if (s->eoln) {
-		s->token_type = TKN_NULL;
+		s->token_type = TOKEN_NULL;
 		return;
 	}
 
@@ -234,7 +234,7 @@ void get_next_token(rState *s)
 	}
 
 	s->cur_token = strL_to_str(list, BLOCK_SIZE, s->count_sym, 1);
-	if (s->token_type == TKN_NULL)
+	if (s->token_type == TOKEN_NULL)
 		s->token_type = token_type(s->cur_token);
 }
 
@@ -285,7 +285,7 @@ void change_in_out(rState *s, pipeline *scmd,
 	if (s->error)
 		return;
 
-	if (s->token_type == TKN_OTHER) {
+	if (s->token_type == TOKEN_OTHER) {
 		if (input) {
 			scmd->input = s->cur_token;
 		} else {
@@ -298,7 +298,7 @@ void change_in_out(rState *s, pipeline *scmd,
 	}
 }
 
-/* Type of current token must be TKN_OTHER */
+/* Type of current token must be TOKEN_OTHER */
 pipeline *get_simple_command(rState *s)
 {
 	pipeline *scmd = new_pipeline_node();
@@ -306,16 +306,16 @@ pipeline *get_simple_command(rState *s)
 	int count = 0;
 
 	while (!s->error) {
-		if (s->token_type == TKN_OTHER) {
+		if (s->token_type == TOKEN_OTHER) {
 			add_strL(&to_argv, s->cur_token);
 			s->str_need = 1;
 			++count;
-		} else if (s->token_type == TKN_INPUT
-				|| s->token_type == TKN_OUTPUT
-				|| s->token_type == TKN_APPEND) {
+		} else if (s->token_type == TOKEN_INPUT
+				|| s->token_type == TOKEN_OUTPUT
+				|| s->token_type == TOKEN_APPEND) {
 			change_in_out(s, scmd,
-				s->token_type == TKN_INPUT,
-				s->token_type == TKN_APPEND);
+				s->token_type == TOKEN_INPUT,
+				s->token_type == TOKEN_APPEND);
 			if (s->error)
 				break;
 		} else
@@ -336,12 +336,12 @@ pipeline *get_simple_command(rState *s)
 	return scmd;
 }
 
-/* Type of current token must be TKN_OTHER */
+/* Type of current token must be TOKEN_OTHER */
 pipeline *get_pipeline(rState *s)
 {
 	pipeline *pl = get_simple_command(s), *cur_cmd = pl;
 
-	while (s->token_type == TKN_PIPELINE) {
+	while (s->token_type == TOKEN_PIPELINE) {
 		get_next_token(s);
 		cur_cmd = cur_cmd->next = get_simple_command(s);
 	}
@@ -372,7 +372,7 @@ commands_list *new_cmds_node(void)
 
 	pl->pl = NULL;
 	pl->cmds = NULL;
-	pl->relation = TKN_OTHER;
+	pl->relation = TOKEN_OTHER;
 	pl->next = NULL;
 
 	return pl;
@@ -438,28 +438,28 @@ command *get_command(rState *s)
 				s->cur_token, s->token_type);
 #endif
 
-		if (head->background && (s->token_type != TKN_NULL
-				&& s->token_type != TKN_CLOSE)) {
+		if (head->background && (s->token_type != TOKEN_NULL
+				&& s->token_type != TOKEN_CLOSE)) {
 			set_error(s);
 			break;
 		}
 
 		switch (s->token_type) {
-		case TKN_NULL:
+		case TOKEN_NULL:
 			return head;
-		case TKN_OTHER:
+		case TOKEN_OTHER:
 			next_cmds_node(head, &cur_pl);
 			cur_pl->pl = get_pipeline(s);
 			break;
-		case TKN_OPEN:
+		case TOKEN_OPEN:
 			next_cmds_node(head, &cur_pl);
 			cur_pl->cmds = get_command(s);
-			if (s->token_type == TKN_CLOSE)
+			if (s->token_type == TOKEN_CLOSE)
 				get_next_token(s);
 			else
 				set_error(s);
 			break;
-		case TKN_REVERSE:
+		case TOKEN_REVERSE:
 			/* not implemented */
 			set_error(s);
 			break;
@@ -477,21 +477,21 @@ command *get_command(rState *s)
 #endif
 
 		switch (s->token_type) {
-		case TKN_NULL:
-		case TKN_CLOSE:
+		case TOKEN_NULL:
+		case TOKEN_CLOSE:
 			return head;
-		case TKN_SEMICOLON:
+		case TOKEN_SEMICOLON:
 			/* lists1 ; lists2 ::= (lists1) ; (lists2) */
 			cur_cmds_to_child(&head, &cur_pl);
 			cur_pl->relation = s->token_type;
 			next_cmds_node(head, &cur_pl);
 			cur_pl->cmds = get_command(s);
 			break;
-		case TKN_AND:
-		case TKN_OR:
+		case TOKEN_AND:
+		case TOKEN_OR:
 			cur_pl->relation = s->token_type;
 			break;
-		case TKN_BG:
+		case TOKEN_BG:
 			if (head->background)
 				set_error(s); /* non bash-like behavior */
 			else
@@ -517,44 +517,44 @@ command *get_command(rState *s)
 void print_relation(int relation)
 {
 	switch (relation) {
-	case TKN_NULL:
-		printf("%s", "TKN_NULL");
+	case TOKEN_NULL:
+		printf("%s", "TOKEN_NULL");
 		break;
-	case TKN_INPUT:
+	case TOKEN_INPUT:
 		printf("%s", "<");
 		break;
-	case TKN_OUTPUT:
+	case TOKEN_OUTPUT:
 		printf("%s", ">");
 		break;
-	case TKN_APPEND:
+	case TOKEN_APPEND:
 		printf("%s", ">>");
 		break;
-	case TKN_PIPELINE:
+	case TOKEN_PIPELINE:
 		printf("%s", "|");
 		break;
-	case TKN_AND:
+	case TOKEN_AND:
 		printf("%s", "&&");
 		break;
-	case TKN_OR:
+	case TOKEN_OR:
 		printf("%s", "||");
 		break;
-	case TKN_SEMICOLON:
+	case TOKEN_SEMICOLON:
 		printf("%s", ";");
 		break;
-	case TKN_OPEN:
+	case TOKEN_OPEN:
 		printf("%s", "(");
 		break;
-	case TKN_CLOSE:
+	case TOKEN_CLOSE:
 		printf("%s", ")");
 		break;
-	case TKN_REVERSE:
+	case TOKEN_REVERSE:
 		printf("%s", "`");
 		break;
-	case TKN_BG:
-		printf("%s", "TKN_BG");
+	case TOKEN_BG:
+		printf("%s", "TOKEN_BG");
 		break;
 	default:
-		printf("%s", "TKN_OTHER");
+		printf("%s", "TOKEN_OTHER");
 		break;
 	}
 	printf("%s", " ");
@@ -593,7 +593,7 @@ void print_command(command *head)
 			print_pipeline(cmds->pl);
 		else
 			print_command(cmds->cmds);
-		if (cmds->relation != TKN_OTHER)
+		if (cmds->relation != TOKEN_OTHER)
 			print_relation(cmds->relation);
 		cmds = cmds->next;
 	}
