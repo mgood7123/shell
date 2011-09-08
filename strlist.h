@@ -1,17 +1,17 @@
 #ifndef _STRLIST_H
 #define _STRLIST_H
 
-typedef struct strL {
+typedef struct strlist {
 	char *str;
-	struct strL *next;
-} strL;
+	struct strlist *next;
+} strlist;
 
-strL *new_strL(int block_size);
-void add_strL(strL **list, char *str);
-char **strL_to_vector(strL *list, int count,
+strlist *new_strlist(int block_size);
+void add_strlist(strlist **list, char *str);
+char **strlist_to_vector(strlist *list, int count,
 		int dispose_structure);
-void dispose_strL(strL *list, int dispose_string);
-char *strL_to_str(strL *list, int block_size,
+void dispose_strlist(strlist *list, int dispose_string);
+char *strlist_to_str(strlist *list, int block_size,
 		int count_sym, int dispose_structure);
 
 #endif

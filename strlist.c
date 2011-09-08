@@ -12,37 +12,37 @@ char *new_str_block(int block_size)
 		return NULL;
 }
 
-strL *new_strL(int block_size)
+strlist *new_strlist(int block_size)
 {
-	strL *list = (strL *) malloc(sizeof(strL));
+	strlist *list = (strlist *) malloc(sizeof(strlist));
 	list->str = new_str_block(block_size);
 	list->next = NULL;
 	return list;
 }
 
-void add_strL(strL **list, char *str)
+void add_strlist(strlist **list, char *str)
 {
-	strL *cur_item = *list;
+	strlist *cur_item = *list;
 
 	if (str == NULL)
 		return;
 
 	if (*list == NULL) {
-		*list = new_strL(-1);
+		*list = new_strlist(-1);
 		(*list)->str = str;
 		return;
 	}
 
 	while (cur_item->next)
 		cur_item = cur_item->next;
-	cur_item->next = new_strL(-1);
+	cur_item->next = new_strlist(-1);
 	cur_item->next->str = str;
 }
 
 /*
-int items_count(strL *list)
+int items_count(strlist *list)
 {
-	strL *cur_item = list;
+	strlist *cur_item = list;
 	int count = 0;
 
 	while (cur_item) {
@@ -54,13 +54,13 @@ int items_count(strL *list)
 }
 */
 
-char **strL_to_vector(strL *list,
+char **strlist_to_vector(strlist *list,
 		int count, int dispose_structure)
 {
-	strL *cur_item = list;
+	strlist *cur_item = list;
 	char **vlist = (char **) malloc((count + 1) * sizeof(char *));
 	char **cur_vlist_item = vlist;
-	strL *next;
+	strlist *next;
 	
 	while (cur_item && count > 0) {
 		next = cur_item->next;
@@ -74,15 +74,15 @@ char **strL_to_vector(strL *list,
 
 	*cur_vlist_item = NULL;
 	if (dispose_structure)
-		dispose_strL(cur_item, 1);
+		dispose_strlist(cur_item, 1);
 
 	return vlist;
 }
 
 /*
-void print_strL(strL *list)
+void print_strlist(strlist *list)
 {
-	strL *cur_item = list;
+	strlist *cur_item = list;
 
 	while (cur_item) {
 		printf("[%s]\n", cur_item->str);
@@ -91,9 +91,9 @@ void print_strL(strL *list)
 }
 */
 
-void dispose_strL(strL *list, int dispose_string)
+void dispose_strlist(strlist *list, int dispose_string)
 {
-	strL *next;
+	strlist *next;
 	while (list) {
 		next = list->next;
 		if (dispose_string)
@@ -104,9 +104,9 @@ void dispose_strL(strL *list, int dispose_string)
 }
 
 /*
-int length_strL(strL *list, int block_size)
+int length_strlist(strlist *list, int block_size)
 {
-	strL *cur_item = list;
+	strlist *cur_item = list;
 	int count = 0;
 
 	if (cur_item == NULL)
@@ -124,10 +124,10 @@ int length_strL(strL *list, int block_size)
 }
 */
 
-char *strL_to_str(strL *list, int block_size,
+char *strlist_to_str(strlist *list, int block_size,
 		int count_sym, int dispose_structure)
 {
-	strL *cur_item = list;
+	strlist *cur_item = list;
 	char *str = NULL, *cur_sym = NULL;
 
 	if (list == NULL)
@@ -136,7 +136,7 @@ char *strL_to_str(strL *list, int block_size,
 	cur_sym = str = (char *) malloc(sizeof(char) * count_sym);
 
 	while (cur_item->next) {
-		strL *tmp = cur_item;
+		strlist *tmp = cur_item;
 		if (block_size < 0) /* for strings different length */
 			block_size = strlen(cur_item->str);
 		memcpy(cur_sym, cur_item->str, block_size);

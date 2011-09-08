@@ -162,7 +162,7 @@ void add_sym(rState *s)
 {
 	if ((s->cur_sym - s->cur_item->str) == (REAL_BLOCK_SIZE - 1)) {
 		*(s->cur_sym) = '\0';
-		s->cur_item = s->cur_item->next = new_strL(REAL_BLOCK_SIZE);
+		s->cur_item = s->cur_item->next = new_strlist(REAL_BLOCK_SIZE);
 		s->cur_sym = s->cur_item->str;
 	}
 	*(s->cur_sym) = s->p;
@@ -201,7 +201,7 @@ int token_type(char *str)
 
 void get_next_token(rState *s)
 {
-	strL *list = NULL;
+	strlist *list = NULL;
 
 	if (!s->str_need && s->cur_token)
 		free(s->cur_token);
@@ -217,7 +217,7 @@ void get_next_token(rState *s)
 		return;
 	}
 
-	list = s->cur_item = new_strL(REAL_BLOCK_SIZE);
+	list = s->cur_item = new_strlist(REAL_BLOCK_SIZE);
 	s->cur_sym = s->cur_item->str;
 
 	do {
@@ -228,12 +228,12 @@ void get_next_token(rState *s)
 	*(s->cur_sym) = '\0';
 
 	if (s->error) {
-		dispose_strL(list, 1);
+		dispose_strlist(list, 1);
 		set_error(s);
 		return;
 	}
 
-	s->cur_token = strL_to_str(list, BLOCK_SIZE, s->count_sym, 1);
+	s->cur_token = strlist_to_str(list, BLOCK_SIZE, s->count_sym, 1);
 	if (s->token_type == TOKEN_NULL)
 		s->token_type = token_type(s->cur_token);
 }
@@ -302,12 +302,12 @@ void change_in_out(rState *s, pipeline *scmd,
 pipeline *get_simple_command(rState *s)
 {
 	pipeline *scmd = new_pipeline_node();
-	strL *to_argv = NULL;
+	strlist *to_argv = NULL;
 	int count = 0;
 
 	while (!s->error) {
 		if (s->token_type == TOKEN_OTHER) {
-			add_strL(&to_argv, s->cur_token);
+			add_strlist(&to_argv, s->cur_token);
 			s->str_need = 1;
 			++count;
 		} else if (s->token_type == TOKEN_INPUT
@@ -325,12 +325,12 @@ pipeline *get_simple_command(rState *s)
 	}
 
 	if (s->error) {
-		dispose_strL(to_argv, 1);
+		dispose_strlist(to_argv, 1);
 		dispose_pipeline(scmd);
 		return NULL;
 	}
 
-	scmd->argv = strL_to_vector(to_argv, count, 1);
+	scmd->argv = strlist_to_vector(to_argv, count, 1);
 	scmd->next = NULL;
 
 	return scmd;

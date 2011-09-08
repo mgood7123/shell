@@ -15,7 +15,7 @@ typedef struct rState {
 /* for free() */
 	unsigned int str_need:1;
 /* temporally, for get_next_token() */
-	strL *cur_item;
+	strlist *cur_item;
 	char *cur_sym;
 	int count_sym;
 /* for make commands */
