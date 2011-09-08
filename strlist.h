@@ -7,7 +7,7 @@ typedef struct strlist {
 } strlist;
 
 strlist *new_strlist(int block_size);
-void add_strlist(strlist **list, char *str);
+void add_to_strlist(strlist **list, char *str);
 char **strlist_to_vector(strlist *list, int count,
 		int dispose_structure);
 void dispose_strlist(strlist *list, int dispose_string);

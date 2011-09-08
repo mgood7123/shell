@@ -307,7 +307,7 @@ pipeline *get_simple_command(rState *s)
 
 	while (!s->error) {
 		if (s->token_type == TOKEN_OTHER) {
-			add_strlist(&to_argv, s->cur_token);
+			add_to_strlist(&to_argv, s->cur_token);
 			s->str_need = 1;
 			++count;
 		} else if (s->token_type == TOKEN_INPUT

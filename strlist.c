@@ -20,7 +20,7 @@ strlist *new_strlist(int block_size)
 	return list;
 }
 
-void add_strlist(strlist **list, char *str)
+void add_to_strlist(strlist **list, char *str)
 {
 	strlist *cur_item = *list;
 
