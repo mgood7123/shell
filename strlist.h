@@ -8,6 +8,7 @@ typedef struct strlist {
 
 typedef struct strlist_ext {
     strlist *strlist;
+    strlist *last_item;
     unsigned int count_sym;
     unsigned int block_size;
 } strlist_ext;
@@ -21,4 +22,6 @@ char *strlist_to_str(strlist *list, unsigned int block_size,
 		int count_sym, int dispose_structure);
 
 strlist_ext *new_strlist_ext (unsigned int block_size);
+strlist *add_item_to_strlist_ext(strlist_ext *e)
+
 #endif

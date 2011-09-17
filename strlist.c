@@ -165,5 +165,15 @@ strlist_ext *new_strlist_ext(unsigned int block_size)
     e->strlist = new_strlist(block_size);
     e->count_sym = 0;
     e->block_size = block_size;
+    e->last_item = e->strlist;
     return e;
+}
+
+/* Returns new item */
+strlist *add_item_to_strlist_ext(strlist_ext *e)
+{
+	while (e->last_item->next)
+		e->last_item = e->last_item->next;
+
+	return e->last_item->next = new_strlist(e->block_size);
 }
