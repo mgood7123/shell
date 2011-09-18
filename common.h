@@ -1,6 +1,10 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
+#include <sys/types.h>
+#include <termios.h>
+#include <unistd.h>
+
 typedef struct process {
     struct process *next;
     char **argv;
@@ -12,14 +16,16 @@ typedef struct process {
 
 typedef struct job {
     struct job *next;
-//need? char *command;
+/*  Need? char *command; */
     process *first_process;
     pid_t pgid;
     int notified:1;
-    ctruct termious tmodes;
+/*    struct termious tmodes;
+ *    Not compiled with it */
     int stdin, stdout, stderr;
 } job;
 
+/* To remove
 typedef struct pipeline {
 	char **argv;
 	char *input;
@@ -39,9 +45,7 @@ typedef struct command {
 	struct commands_list *list;
 	int background;
 } command;
-
-/* for setenv() */
-#define _POSIX_C_SOURCE 200112L
+*/
 
 /*
 #define PRINT_PARSED_COMMAND

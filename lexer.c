@@ -1,74 +1,39 @@
-#include buffer.h
+#include "lexer.h"
 
-enum type_of_lex {
-    LEX_INPUT;         /* '<'  */
-    LEX_OUTPUT;        /* '>'  */
-    LEX_APPEND;        /* '>>' */
-    LEX_PIPE;          /* '|'  */
-    LEX_OR;            /* '||' */
-    LEX_BACKGROUND;    /* '&'  */
-    LEX_AND;           /* '&&' */
-    LEX_SEMICOLON;     /* ';'  */
-    LEX_BRACKET_OPEN;  /* '('  */
-    LEX_BRACKET_CLOSE; /* ')'  */
-    LEX_REVERSE;       /* '`'  */
-    LEX_WORD;     /* all different */
-    LEX_EOLINE;        /* '\n' */
-    LEX_EOFILE;        /* EOF  */
-};
+#include "buffer.h"
+#include <stdio.h>
+#include <stdlib.h>
 
-typedef struct lex {
-    struct lex *next;
-    type_of_lex type;
-    char *str;
-} lex;
-
-enum lexer_state {
-    START;
-
-    ONE_SYM_LEX;
-    /* '<', ';', '(', ')' */
-    ONE_TWO_SYM_LEX;
-    /* '>', '>>', '|', '||', '&', '&&'; */
-
-    BACKSLASH;
-    BACKSLASH_IN_QUOTES;
-    IN_QUOTES;
-
-    ERROR;
-    OTHER;
-
-    END_OF;
-}
-
-typedef struct lexer_info {
-    lexer_state state;
-    char c;     /* current symbol */
-    buffer buf; /* symbols buffer */
-}
-
-lex *make_lex (type_of_lex type)
+void get_char (lexer_info *info)
 {
-    lex *lex = (lex *) malloc (sizeof (lex));
+    info->c = getchar();
+}
+
+void init_lexer (lexer_info *info)
+{
+/*    lexer_info *info =
+        (lexer_info *) malloc (sizeof (lexer_info)); */
+    info->state = START;
+    get_char(info);
+}
+
+lexeme *make_lex (type_of_lex type)
+{
+    lexeme *lex = (lexeme *) malloc (sizeof (lexeme));
     lex->next = NULL;
     lex->type = type;
     lex->str = NULL;
     return lex;
 }
 
-void get_char (lexer_info *info);
-void flush_buffer ();
-void add (lexer_info *info, char sym);
-void add_current (lexer_info *info);
-
-
-void add_current(lexer_info *info)
+lexeme *get_lex(lexer_info *info)
 {
-    add(info, info->c);
-}
+    lexeme *lex = NULL;
+    buffer buf;
+    char old_char; /* Used only in ONE_TWO_SYM_LEX */
 
-lex *get_lex(lexer_info *info)
-{
+    new_buffer (&buf);
+
     do {
         switch (info->state) {
         case START:
@@ -109,7 +74,6 @@ lex *get_lex(lexer_info *info)
             break;
 
         case ONE_SYM_LEX:
-            lex *lex;
             switch (info->c) {
             case '<':
                 lex = make_lex (LEX_INPUT);
@@ -133,8 +97,7 @@ lex *get_lex(lexer_info *info)
             return lex;
 
         case ONE_TWO_SYM_LEX:
-            lex *lex;
-            char old_char = info->c;
+            old_char = info->c;
             /* We don't need buffer */
             get_char (info);
             switch (info->c) {
@@ -148,7 +111,7 @@ lex *get_lex(lexer_info *info)
                     make_lex (LEX_OR) :
                     make_lex (LEX_PIPE);
                 break;
-            case '(':
+            case '&':
                 lex = (old_char == info->c) ?
                     make_lex (LEX_AND) :
                     make_lex (LEX_BACKGROUND);
@@ -163,35 +126,37 @@ lex *get_lex(lexer_info *info)
         case BACKSLASH:
             switch (info->c) {
             case 'a':
-                add (info, '\a');
+                add_to_buffer (&buf, '\a');
                 break;
             case 'b':
-                add (info, '\b');
+                add_to_buffer (&buf, '\b');
                 break;
             case 'f':
-                add (info, '\f');
+                add_to_buffer (&buf, '\f');
                 break;
             case 'n':
-                add (info, '\n');
+                add_to_buffer (&buf, '\n');
                 break;
             case 'r':
-                add (info, '\r');
+                add_to_buffer (&buf, '\r');
                 break;
             case 't':
-                add (info, '\t');
+                add_to_buffer (&buf, '\t');
                 break;
             case 'v':
-                add (info, '\v');
+                add_to_buffer (&buf, '\v');
                 break;
             case ' ':
             case '\"':
             case '\\':
-                add_current (info);
+                add_to_buffer (&buf, info->c);
             case '\n':
+                /* Ignore newline symbol */
                 break;
             default:
-                add (info, '\\');
-                add_current (info);
+                /* Substitution not found */
+                add_to_buffer (&buf, '\\');
+                add_to_buffer (&buf, info->c);
             }
             get_char(info);
             info->state = START;
@@ -214,14 +179,14 @@ lex *get_lex(lexer_info *info)
                 info->state = START;
                 break;
             default:
-                add_current (info);
+                add_to_buffer (&buf, info->c);
                 get_char (info);
                 break;
             }
             break;
 
         case OTHER:
-            add_current (info);
+            add_to_buffer (&buf, info->c);
             get_char (info);
             info->state = START;
             break;
@@ -231,11 +196,10 @@ lex *get_lex(lexer_info *info)
             break;
 
         case END_OF:
-            lex *lex;
             switch (info->c) {
             case '\n':
                 lex = make_lex(LEX_EOLINE);
-                break
+                break;
             case EOF:
                 lex = make_lex(LEX_EOFILE);
                 break;
@@ -248,5 +212,5 @@ lex *get_lex(lexer_info *info)
             exit (1);
             break;
         }
-    } while (true);
+    } while (1);
 }

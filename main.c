@@ -1,13 +1,18 @@
 #include "common.h"
-#include "parser.h"
-#include "runner.h"
+#include "lexer.h"
+/* #include "runner.h" */
+
+/* for setenv () */
+#define _POSIX_C_SOURCE 200112L
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <signal.h>
 
+/*
 char **global_envp;
 pid_t shell_pgid;
 
@@ -30,6 +35,7 @@ void set_sig_dfl(void)
 	signal(SIGTTOU, SIG_DFL);
 	signal(SIGCHLD, SIG_DFL);
 }
+*/
 
 /* Shell initialization:
  * save envp;
@@ -41,6 +47,7 @@ void set_sig_dfl(void)
 
 /* Note: this is not check for
  * interactively/background runned shell. */
+/*
 void init_shell(char **envp)
 {
 	char *pwd;
@@ -110,40 +117,39 @@ void print_set()
 	while (*envp)
 		printf("%s\n", *(envp++));
 }
+*/
 
 int main(int argc, char **argv, char **envp)
 {
-	rState *s = new_rState();
+	lexer_info lexer_info;
+    init_lexer (&lexer_info);
 /*	signal(SIGINT, SIG_IGN);  TODO: not ignore, continue main do..while */
 
-	init_envp(envp);
+/*	init_shell(envp);*/
 
 	do {
-		command *cmd = NULL;
-		print_prompt1();
-		get_next_sym(s); /* init rState */
-		cmd = get_command(s);
-		if (s->eof)
+        lexeme *lex = get_lex (&lexer_info);
+        printf("[%d] ", lex->type);
+		if (lex->type == LEX_EOFILE)
 			return 0;
 
-		if (s->error) {
-			unset_error(s);
+		if (lexer_info.state == ERROR) {
 			printf("%s", "(>_<)\n");
 			continue;
 		}
+/*
 #ifdef PRINT_PARSED_COMMAND
 		printf("PARSED: ");
 		print_command(cmd);
 		printf("\n");
 #endif
-
+*/
 /*		signal(SIGINT, SIG_DFL);  TODO: kill fg process */
-		run_command(cmd);
+/*		run_command(cmd); */
 /*		signal(SIGINT, SIG_IGN);*/
 
-		dispose_command(cmd);
+/*		dispose_command(cmd); */
 	} while (1);
 
-	free(s);
 	return 0;
 }

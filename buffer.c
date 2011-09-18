@@ -1,12 +1,14 @@
 #include "buffer.h"
 
-buffer *new_buffer ()
+#include <stdlib.h>
+#include <string.h>
+
+void new_buffer (buffer *buf)
 {
-    buffer *buf = (buffer *) malloc (sizeof (strlist));
+/*    buffer *buf = (buffer *) malloc (sizeof (buffer)); */
     buf->first_block = NULL;
     buf->last_block = NULL;
     buf->count_sym = 0;
-    return buf;
 }
 
 void add_to_buffer (buffer *buf, char c)
@@ -15,7 +17,7 @@ void add_to_buffer (buffer *buf, char c)
 
     if (buf->first_block == NULL) {
         buf->last_block = buf->first_block =
-            (strblock *) malloc (sizeof (strblock);
+            (strblock *) malloc (sizeof (strblock));
         buf->last_block->str =
             (char *) malloc (sizeof (char) * BLOCK_SIZE);
     } else if (pos == 0) {
@@ -25,7 +27,7 @@ void add_to_buffer (buffer *buf, char c)
             (char *) malloc (sizeof (char) * BLOCK_SIZE);
     }
 
-    *(buf->last_block + pos) = c;
+    *(buf->last_block->str + pos) = c;
     ++(buf->count_sym);
 }
 

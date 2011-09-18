@@ -1,11 +1,12 @@
-SRCMODULES = strlist.c parser.c runner.c
+SRCMODULES = buffer.c lexer.c
+#runner.c
 OBJMODULES = $(SRCMODULES:.c=.o)
 CFLAGS = -g -Wall -ansi -pedantic
 
 %.o: %.c %.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-tshell: main.c $(OBJMODULES)
+shell: main.c $(OBJMODULES)
 	$(CC) $(CFLAGS) $^ -o $@
 
 ifneq (clean, $(MAKECMDGOALS))
@@ -16,4 +17,4 @@ deps.mk: $(SRCMODULES)
 	$(CC) -MM $^ > $@
 
 clean:
-	rm -f *.o tshell deps.mk
+	rm -f *.o shell deps.mk
