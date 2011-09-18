@@ -6,18 +6,18 @@
 */
 
 enum type_of_lex {
-    INPUT;
-    OUTPUT;
-    APPEND;
-    PIPE;
-    OR;
-    BACKGROUND;
-    AND;
-    SEMICOLON;
-    BRACKET_OPEN;
-    BRACKET_CLOSE;
-    REVERSE;
-    WORD;
+    LEX_INPUT;
+    LEX_OUTPUT;
+    LEX_APPEND;
+    LEX_PIPE;
+    LEX_OR;
+    LEX_BACKGROUND;
+    LEX_AND;
+    LEX_SEMICOLON;
+    LEX_BRACKET_OPEN;
+    LEX_BRACKET_CLOSE;
+    LEX_REVERSE;
+    LEX_WORD;
 };
 
 typedef struct lex {
@@ -48,10 +48,19 @@ typedef struct lexer_info {
     buffer buf; /* symbols buffer */
 }
 
-void get_char(lexer_info *info);
-void flush_buffer();
-void add(lexer_info *info, char sym);
-void add_current(lexer_info *info);
+lex *make_lex (type_of_lex type)
+{
+    lex *lex = (lex *) malloc(sizeof(lex));
+    lex->next = NULL;
+    lex->type = type;
+    lex->str = NULL;
+    return lex;
+}
+
+void get_char (lexer_info *info);
+void flush_buffer ();
+void add (lexer_info *info, char sym);
+void add_current (lexer_info *info);
 
 
 void add_current(lexer_info *info)
@@ -72,27 +81,27 @@ lex *get_lex(lexer_info *info)
                 /* TODO */
                 break;
             case ' ':
-                get_char(info);
+                get_char (info);
                 break;
             case '<':
             case ';':
             case '(':
             case ')':
-                get_char(info);
+                get_char (info);
                 info->state = ONE_SYM_LEX;
                 break;
             case '>':
             case '|':
             case '&':
-                get_char(info);
+                get_char (info);
                 info->state = ONE_TWO_SYM_LEX;
                 break;
             case '\\':
-                get_char(info);
+                get_char (info);
                 info->state = BACKSLASH;
                 break;
             case '\"':
-                get_char(info);
+                get_char (info);
                 info->state = IN_QUOTES;
                 break;
             default:
@@ -102,55 +111,88 @@ lex *get_lex(lexer_info *info)
             break;
 
         case ONE_SYM_LEX:
-            /* TODO: make lex */
+            lex *lex;
+            switch (info->c) {
+            case '<':
+                lex = make_lex (LEX_INPUT);
+                break;
+            case ';':
+                lex = make_lex (LEX_SEMICOLON);
+                break;
+            case '(':
+                lex = make_lex (LEX_BRACKET_OPEN);
+                break;
+            case ')':
+                lex = make_lex (LEX_BRACKET_CLOSE);
+                break;
+            default:
+                fprintf (stderr, "Lexer: error in ONE_SYM_LEX.");
+                exit (1);
+            }
             /* We don't need buffer */
-            get_char(info);
+            get_char (info);
             return lex;
 
         case ONE_TWO_SYM_LEX:
+            lex *lex;
             char old_char = info->c;
             /* We don't need buffer */
-            get_char(info);
-            if (old_char == info->c) {
-                /* TODO: make lex from two symbols */
-            } else {
-                /* TODO: make lex from one symbol */
+            get_char (info);
+            switch (info->c) {
+            case '>':
+                lex = (old_char == info->c) ?
+                    make_lex (LEX_APPEND) :
+                    make_lex (LEX_OUTPUT);
+                break;
+            case '|':
+                lex = (old_char == info->c) ?
+                    make_lex (LEX_OR) :
+                    make_lex (LEX_PIPE);
+                break;
+            case '(':
+                lex = (old_char == info->c) ?
+                    make_lex (LEX_AND) :
+                    make_lex (LEX_BACKGROUND);
+                break;
+            default:
+                fprintf (stderr, "Lexer: error in ONE_TWO_SYM_LEX.");
+                exit (1);
             }
             info->state = START;
             return lex;
 
         case BACKSLASH:
-            switch (c) {
+            switch (info->c) {
             case 'a':
-                add(info, '\a');
+                add (info, '\a');
                 break;
             case 'b':
-                add(info, '\b');
+                add (info, '\b');
                 break;
             case 'f':
-                add(info, '\f');
+                add (info, '\f');
                 break;
             case 'n':
-                add(info, '\n');
+                add (info, '\n');
                 break;
             case 'r':
-                add(info, '\r');
+                add (info, '\r');
                 break;
             case 't':
-                add(info, '\t');
+                add (info, '\t');
                 break;
             case 'v':
-                add(info, '\v');
+                add (info, '\v');
                 break;
             case ' ':
             case '\"':
             case '\\':
-                add_current(info);
+                add_current (info);
             case '\n':
                 break;
             default:
-                add(info, '\\');
-                add_current(info);
+                add (info, '\\');
+                add_current (info);
             }
             get_char(info);
             info->state = START;
@@ -165,23 +207,23 @@ lex *get_lex(lexer_info *info)
         case IN_QUOTES:
             switch (info->c) {
             case '\\':
-                get_char(info);
+                get_char (info);
                 info->state = BACKSLASH_IN_QUOTES;
                 break;
             case '\"':
-                get_char(info);
+                get_char (info);
                 info->state = START;
                 break;
             default:
-                add_current(info);
-                get_char();
+                add_current (info);
+                get_char (info);
                 break;
             }
             break;
 
         case OTHER:
-            add_current(info);
-            get_char();
+            add_current (info);
+            get_char (info);
             info->state = START;
             break;
 
@@ -190,7 +232,8 @@ lex *get_lex(lexer_info *info)
             break;
 
         default:
-            /* ??! */
+            fprintf (stderr, "Lexer: error in main switch.");
+            exit (1);
             break;
         }
     } while (true);
