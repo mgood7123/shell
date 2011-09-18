@@ -1,23 +1,20 @@
-/* TODO: move to buffer.c
-#include "strlist.h"
-
-#define BLOCK_SIZE 8
-#define REAL_BLOCK_SIZE (BLOCK_SIZE+1)
-*/
+#include buffer.h
 
 enum type_of_lex {
-    LEX_INPUT;
-    LEX_OUTPUT;
-    LEX_APPEND;
-    LEX_PIPE;
-    LEX_OR;
-    LEX_BACKGROUND;
-    LEX_AND;
-    LEX_SEMICOLON;
-    LEX_BRACKET_OPEN;
-    LEX_BRACKET_CLOSE;
-    LEX_REVERSE;
-    LEX_WORD;
+    LEX_INPUT;         /* '<'  */
+    LEX_OUTPUT;        /* '>'  */
+    LEX_APPEND;        /* '>>' */
+    LEX_PIPE;          /* '|'  */
+    LEX_OR;            /* '||' */
+    LEX_BACKGROUND;    /* '&'  */
+    LEX_AND;           /* '&&' */
+    LEX_SEMICOLON;     /* ';'  */
+    LEX_BRACKET_OPEN;  /* '('  */
+    LEX_BRACKET_CLOSE; /* ')'  */
+    LEX_REVERSE;       /* '`'  */
+    LEX_WORD;     /* all different */
+    LEX_EOLINE;        /* '\n' */
+    LEX_EOFILE;        /* EOF  */
 };
 
 typedef struct lex {
@@ -40,17 +37,19 @@ enum lexer_state {
 
     ERROR;
     OTHER;
+
+    END_OF;
 }
 
 typedef struct lexer_info {
     lexer_state state;
-    char c; /* current symbol */
+    char c;     /* current symbol */
     buffer buf; /* symbols buffer */
 }
 
 lex *make_lex (type_of_lex type)
 {
-    lex *lex = (lex *) malloc(sizeof(lex));
+    lex *lex = (lex *) malloc (sizeof (lex));
     lex->next = NULL;
     lex->type = type;
     lex->str = NULL;
@@ -75,11 +74,10 @@ lex *get_lex(lexer_info *info)
         case START:
             switch (info->c) {
             case EOF:
-                /* TODO */
-                break;
             case '\n':
-                /* TODO */
-                break;
+                /* TODO return buffer */
+                info->state = END_OF;
+                return lex;
             case ' ':
                 get_char (info);
                 break;
@@ -131,6 +129,7 @@ lex *get_lex(lexer_info *info)
             }
             /* We don't need buffer */
             get_char (info);
+            info->state = START;
             return lex;
 
         case ONE_TWO_SYM_LEX:
@@ -231,6 +230,19 @@ lex *get_lex(lexer_info *info)
             /* TODO */
             break;
 
+        case END_OF:
+            lex *lex;
+            switch (info->c) {
+            case '\n':
+                lex = make_lex(LEX_EOLINE);
+                break
+            case EOF:
+                lex = make_lex(LEX_EOFILE);
+                break;
+            }
+            info->state = START;
+            return lex;
+
         default:
             fprintf (stderr, "Lexer: error in main switch.");
             exit (1);
@@ -238,36 +250,3 @@ lex *get_lex(lexer_info *info)
         }
     } while (true);
 }
-
-
-/* Returns readed (by getchar) symbols count */
-/* TODO: remove
-int read_block(char *str)
-{
-    int i;
-    for (i = 0; i < BLOCK_SIZE; ++i) {
-        *str = getchar();
-        ++str;
-        if (*str == TERM_SYM)
-            break;
-    }
-    *str = '\0';
-    return i + 1;
-}
-*/
-
-/* return NULL if error */
-/* TODO: remove
-{
-    strlist_ext *buffer = new_strlist_ext(REAL_BLOCK_SIZE);
-
-    do {
-        buffer->count_sym += read_block(e->last_item->str);
-        add_item_to_strlist_ext(buffer);
-        // возможен лишний блок в конце.
-    } while(!eow);
-    strlist_to_str
-    match token type
-    return token;
-}
-*/
