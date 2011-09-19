@@ -4,8 +4,8 @@
 #define BLOCK_SIZE 8
 
 typedef struct strblock {
-	char *str;
 	struct strblock *next;
+	char *str;
 } strblock;
 
 typedef struct buffer {
