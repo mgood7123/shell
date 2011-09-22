@@ -19,7 +19,7 @@ typedef enum type_of_lex {
 } type_of_lex;
 
 typedef struct lexeme {
-    struct lexeme *next;
+/*    struct lexeme *next; */
     type_of_lex type;
     char *str;
 } lexeme;
@@ -28,8 +28,7 @@ typedef enum lexer_state {
     ST_START,
     ST_ONE_SYM_LEX,
     /* '<', ';', '(', ')' */
-    ST_ONE_TWO_SYM_LEX_1,
-    ST_ONE_TWO_SYM_LEX_2,
+    ST_ONE_TWO_SYM_LEX,
     /* '>', '>>', '|', '||', '&', '&&' */
     ST_BACKSLASH,
     ST_BACKSLASH_IN_QUOTES,
@@ -41,11 +40,13 @@ typedef enum lexer_state {
 
 typedef struct lexer_info {
     lexer_state state;
-    char c; /* current symbol */
+    int c; /* current symbol */
     unsigned int get_next_char:1;
 } lexer_info;
 
 void init_lexer (lexer_info *info);
 lexeme *get_lex (lexer_info *info);
+void destroy_lex (lexeme *lex);
+void print_lex (lexeme *lex);
 
 #endif

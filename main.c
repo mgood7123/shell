@@ -128,68 +128,17 @@ int main(int argc, char **argv, char **envp)
 /*	init_shell(envp);*/
 
 	do {
-/*        if (lexer_info.state == ST_EOLN_EOF)
-            init_lexer(&lexer_info);*/
         lexeme *lex = get_lex (&lexer_info);
-        printf ("!!! Lexeme: ");
-        switch (lex->type) {
-        case LEX_INPUT:         /* '<'  */
-            printf ("[<]\n");
-            break;
-        case LEX_OUTPUT:        /* '>'  */
-            printf ("[>]\n");
-            break;
-        case LEX_APPEND:        /* '>>' */
-            printf ("[>>]\n");
-            break;
-        case LEX_PIPE:          /* '|'  */
-            printf ("[|]\n");
-            break;
-        case LEX_OR:            /* '||' */
-            printf ("[||]\n");
-            break;
-        case LEX_BACKGROUND:    /* '&'  */
-            printf ("[&]\n");
-            break;
-        case LEX_AND:           /* '&&' */
-            printf ("[&&]\n");
-            break;
-        case LEX_SEMICOLON:     /* ';'  */
-            printf ("[;]\n");
-            break;
-        case LEX_BRACKET_OPEN:  /* '('  */
-            printf ("[(]\n");
-            break;
-        case LEX_BRACKET_CLOSE: /* ')'  */
-            printf ("[)]\n");
-            break;
-        case LEX_REVERSE:       /* '`'  */
-            printf ("[`]\n");
-            break;
-        case LEX_WORD:     /* all different */
-            printf ("[WORD:%s]\n", lex->str);
-            break;
-        case LEX_EOLINE:        /* '\n' */
-            printf ("[EOLINE]\n");
-            break;
-        case LEX_EOFILE:         /* EOF  */
-            printf ("[EOFILE]\n");
-            break;
-        }
+        print_lex (lex);
         if (lex->type == LEX_EOFILE)
             return 0;
+        destroy_lex (lex);
 
 		if (lexer_info.state == ST_ERROR) {
-			printf("(>_<)\n");
+			fprintf(stderr, "(>_<)\n");
 			continue;
 		}
-/*
-#ifdef PRINT_PARSED_COMMAND
-		printf("PARSED: ");
-		print_command(cmd);
-		printf("\n");
-#endif
-*/
+
 /*		signal(SIGINT, SIG_DFL);  TODO: kill fg process */
 /*		run_command(cmd); */
 /*		signal(SIGINT, SIG_IGN);*/
