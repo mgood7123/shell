@@ -47,12 +47,6 @@ typedef struct command {
 } command;
 */
 
-/*
-#define PRINT_PARSED_COMMAND
-#define DEBUG_PARSER
-#define DEBUG_RUNNER
-*/
-
 #define TERM_DESC STDIN_FILENO
 
 #endif

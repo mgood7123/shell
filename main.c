@@ -128,13 +128,59 @@ int main(int argc, char **argv, char **envp)
 /*	init_shell(envp);*/
 
 	do {
+/*        if (lexer_info.state == ST_EOLN_EOF)
+            init_lexer(&lexer_info);*/
         lexeme *lex = get_lex (&lexer_info);
-        printf("[%d] ", lex->type);
-		if (lex->type == LEX_EOFILE)
-			return 0;
+        printf ("!!! Lexeme: ");
+        switch (lex->type) {
+        case LEX_INPUT:         /* '<'  */
+            printf ("[<]\n");
+            break;
+        case LEX_OUTPUT:        /* '>'  */
+            printf ("[>]\n");
+            break;
+        case LEX_APPEND:        /* '>>' */
+            printf ("[>>]\n");
+            break;
+        case LEX_PIPE:          /* '|'  */
+            printf ("[|]\n");
+            break;
+        case LEX_OR:            /* '||' */
+            printf ("[||]\n");
+            break;
+        case LEX_BACKGROUND:    /* '&'  */
+            printf ("[&]\n");
+            break;
+        case LEX_AND:           /* '&&' */
+            printf ("[&&]\n");
+            break;
+        case LEX_SEMICOLON:     /* ';'  */
+            printf ("[;]\n");
+            break;
+        case LEX_BRACKET_OPEN:  /* '('  */
+            printf ("[(]\n");
+            break;
+        case LEX_BRACKET_CLOSE: /* ')'  */
+            printf ("[)]\n");
+            break;
+        case LEX_REVERSE:       /* '`'  */
+            printf ("[`]\n");
+            break;
+        case LEX_WORD:     /* all different */
+            printf ("[WORD:%s]\n", lex->str);
+            break;
+        case LEX_EOLINE:        /* '\n' */
+            printf ("[EOLINE]\n");
+            break;
+        case LEX_EOFILE:         /* EOF  */
+            printf ("[EOFILE]\n");
+            break;
+        }
+        if (lex->type == LEX_EOFILE)
+            return 0;
 
-		if (lexer_info.state == ERROR) {
-			printf("%s", "(>_<)\n");
+		if (lexer_info.state == ST_ERROR) {
+			printf("(>_<)\n");
 			continue;
 		}
 /*

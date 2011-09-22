@@ -4,6 +4,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* #define DEBUG_LEXER */
+
+void print_state (const char *state_name, char c)
+{
+    fprintf (stderr, "Lexer: %s; ", state_name);
+
+    switch (c) {
+    case '\n':
+        fprintf(stderr, "\'\\n\';\n");
+        break;
+    case EOF:
+        fprintf(stderr, "\'EOF\';\n");
+        break;
+    default:
+        fprintf(stderr, "\'%c\';\n", c);
+        break;
+    }
+}
+
+void deferred_get_char (lexer_info *info)
+{
+    info->get_next_char = 1;
+}
+
 void get_char (lexer_info *info)
 {
     info->c = getchar();
@@ -11,10 +35,11 @@ void get_char (lexer_info *info)
 
 void init_lexer (lexer_info *info)
 {
-/*    lexer_info *info =
+/*  lexer_info *info =
         (lexer_info *) malloc (sizeof (lexer_info)); */
-    info->state = START;
-    get_char(info);
+
+    deferred_get_char (info);
+    info->state = ST_START;
 }
 
 lexeme *make_lex (type_of_lex type)
@@ -26,54 +51,60 @@ lexeme *make_lex (type_of_lex type)
     return lex;
 }
 
-lexeme *get_lex(lexer_info *info)
+lexeme *get_lex (lexer_info *info)
 {
     lexeme *lex = NULL;
     buffer buf;
-    char old_char; /* Used only in ONE_TWO_SYM_LEX */
 
     new_buffer (&buf);
 
     do {
+        if (info->get_next_char) {
+            info->get_next_char = 0;
+            get_char (info);
+        }
+
         switch (info->state) {
-        case START:
+        case ST_START:
+#ifdef DEBUG_LEXER
+            print_state ("ST_START", info->c);
+#endif
+
             switch (info->c) {
             case EOF:
             case '\n':
-                /* TODO return buffer */
-                info->state = END_OF;
-                return lex;
+                info->state = ST_EOLN_EOF;
+                break;
             case ' ':
-                get_char (info);
+                deferred_get_char (info);
                 break;
             case '<':
             case ';':
             case '(':
             case ')':
-                get_char (info);
-                info->state = ONE_SYM_LEX;
+                info->state = ST_ONE_SYM_LEX;
                 break;
             case '>':
             case '|':
             case '&':
-                get_char (info);
-                info->state = ONE_TWO_SYM_LEX;
+                info->state = ST_ONE_TWO_SYM_LEX_1;
                 break;
             case '\\':
-                get_char (info);
-                info->state = BACKSLASH;
+                deferred_get_char (info);
+                info->state = ST_BACKSLASH;
                 break;
             case '\"':
-                get_char (info);
-                info->state = IN_QUOTES;
-                break;
             default:
-                info->state = OTHER;
+                info->state = ST_WORD;
                 break;
             }
             break;
 
-        case ONE_SYM_LEX:
+        case ST_ONE_SYM_LEX:
+#ifdef DEBUG_LEXER
+            print_state ("ST_ONE_SYM_LEX", info->c);
+#endif
+
             switch (info->c) {
             case '<':
                 lex = make_lex (LEX_INPUT);
@@ -88,43 +119,71 @@ lexeme *get_lex(lexer_info *info)
                 lex = make_lex (LEX_BRACKET_CLOSE);
                 break;
             default:
-                fprintf (stderr, "Lexer: error in ONE_SYM_LEX.");
+                fprintf (stderr, "Lexer: error in ST_ONE_SYM_LEX;");
+                print_state ("ST_ONE_SYM_LEX", info->c);
                 exit (1);
             }
             /* We don't need buffer */
-            get_char (info);
-            info->state = START;
+            deferred_get_char (info);
+            info->state = ST_START;
             return lex;
 
-        case ONE_TWO_SYM_LEX:
-            old_char = info->c;
-            /* We don't need buffer */
-            get_char (info);
-            switch (info->c) {
+        case ST_ONE_TWO_SYM_LEX_1:
+#ifdef DEBUG_LEXER
+            print_state ("ST_ONE_TWO_SYM_LEX_1", info->c);
+#endif
+
+            add_to_buffer (&buf, info->c);
+            deferred_get_char (info);
+            info->state = ST_ONE_TWO_SYM_LEX_2;
+            break;
+
+        case ST_ONE_TWO_SYM_LEX_2:
+#ifdef DEBUG_LEXER
+            print_state ("ST_ONE_TWO_SYM_LEX_2", info->c);
+#endif
+
+            switch (get_last_from_buffer (&buf)) {
             case '>':
-                lex = (old_char == info->c) ?
+                lex = (get_last_from_buffer (&buf) == info->c) ?
                     make_lex (LEX_APPEND) :
                     make_lex (LEX_OUTPUT);
                 break;
             case '|':
-                lex = (old_char == info->c) ?
+                lex = (get_last_from_buffer (&buf) == info->c) ?
                     make_lex (LEX_OR) :
                     make_lex (LEX_PIPE);
                 break;
             case '&':
-                lex = (old_char == info->c) ?
+                lex = (get_last_from_buffer (&buf) == info->c) ?
                     make_lex (LEX_AND) :
                     make_lex (LEX_BACKGROUND);
                 break;
             default:
-                fprintf (stderr, "Lexer: error in ONE_TWO_SYM_LEX.");
+                fprintf (stderr, "Lexer: error in ST_ONE_TWO_SYM_LEX_2;");
+                print_state ("ST_ONE_TWO_SYM_LEX_2", info->c);
                 exit (1);
             }
-            info->state = START;
+            deferred_get_char (info);
+            info->state = ST_START;
             return lex;
 
-        case BACKSLASH:
+        case ST_BACKSLASH:
+#ifdef DEBUG_LEXER
+            print_state ("ST_BACKSLASH", info->c);
+#endif
+
             switch (info->c) {
+            case EOF:
+                info->state = ST_ERROR;
+                break;
+            case ' ':
+            case '\"':
+            case '\\':
+                add_to_buffer (&buf, info->c);
+            case '\n':
+                /* Ignore newline symbol */
+                break;
             case 'a':
                 add_to_buffer (&buf, '\a');
                 break;
@@ -146,56 +205,90 @@ lexeme *get_lex(lexer_info *info)
             case 'v':
                 add_to_buffer (&buf, '\v');
                 break;
-            case ' ':
-            case '\"':
-            case '\\':
-                add_to_buffer (&buf, info->c);
-            case '\n':
-                /* Ignore newline symbol */
-                break;
             default:
                 /* Substitution not found */
                 add_to_buffer (&buf, '\\');
                 add_to_buffer (&buf, info->c);
             }
-            get_char(info);
-            info->state = START;
+            deferred_get_char (info);
+            info->state = ST_START;
             break;
 
-        case BACKSLASH_IN_QUOTES:
-            /* TODO: what different from BACKSLASH? */
-            /* Probably, absolutelly identical BACKSLASH,
-             * but: info->state = IN_QUOTES */
+        case ST_BACKSLASH_IN_QUOTES:
+#ifdef DEBUG_LEXER
+            print_state ("ST_BACKSLASH_IN_QUOTES", info->c);
+#endif
+
+            /* TODO: what different from ST_BACKSLASH? */
+            /* Probably, absolutelly identical ST_BACKSLASH,
+             * but: info->state = ST_IN_QUOTES */
             break;
 
-        case IN_QUOTES:
+        case ST_IN_QUOTES:
+#ifdef DEBUG_LEXER
+            print_state ("ST_IN_QUOTES", info->c);
+#endif
+
             switch (info->c) {
+            case EOF:
+                info->state = ST_ERROR;
+                break;
             case '\\':
-                get_char (info);
-                info->state = BACKSLASH_IN_QUOTES;
+                deferred_get_char (info);
+                info->state = ST_BACKSLASH_IN_QUOTES;
                 break;
             case '\"':
-                get_char (info);
-                info->state = START;
+                deferred_get_char (info);
+                info->state = ST_WORD;
                 break;
             default:
                 add_to_buffer (&buf, info->c);
-                get_char (info);
+                deferred_get_char (info);
                 break;
             }
             break;
 
-        case OTHER:
-            add_to_buffer (&buf, info->c);
-            get_char (info);
-            info->state = START;
+        case ST_WORD:
+#ifdef DEBUG_LEXER
+            print_state ("ST_WORD", info->c);
+#endif
+
+            switch (info->c) {
+            case EOF:
+            case '\n':
+            case ' ':
+            case '<':
+            case ';':
+            case '(':
+            case ')':
+            case '>':
+            case '|':
+            case '&':
+            case '`':
+                info->state = ST_START;
+                lex = make_lex (LEX_WORD);
+                lex->str = convert_to_string (&buf, 1);
+                clear_buffer (&buf);
+                return lex;
+            case '\"':
+                deferred_get_char (info);
+                info->state = ST_IN_QUOTES;
+                break;
+            default:
+                add_to_buffer (&buf, info->c);
+                deferred_get_char (info);
+            }
             break;
 
-        case ERROR:
-            /* TODO */
+        case ST_ERROR:
+            print_state ("ST_ERROR", info->c);
             break;
 
-        case END_OF:
+        case ST_EOLN_EOF:
+#ifdef DEBUG_LEXER
+            print_state ("ST_EOLN_EOF", info->c);
+#endif
+
             switch (info->c) {
             case '\n':
                 lex = make_lex(LEX_EOLINE);
@@ -203,12 +296,17 @@ lexeme *get_lex(lexer_info *info)
             case EOF:
                 lex = make_lex(LEX_EOFILE);
                 break;
+            default:
+                fprintf (stderr, "Lexer: error in ST_EOLN_EOF;");
+                print_state ("ST_EOLN_EOF", info->c);
+                exit (1);
             }
-            info->state = START;
+            deferred_get_char (info);
+            info->state = ST_START;
             return lex;
 
         default:
-            fprintf (stderr, "Lexer: error in main switch.");
+            print_state ("unrecognized state", info->c);
             exit (1);
             break;
         }

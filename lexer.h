@@ -25,25 +25,27 @@ typedef struct lexeme {
 } lexeme;
 
 typedef enum lexer_state {
-    START,
-    ONE_SYM_LEX,
+    ST_START,
+    ST_ONE_SYM_LEX,
     /* '<', ';', '(', ')' */
-    ONE_TWO_SYM_LEX,
+    ST_ONE_TWO_SYM_LEX_1,
+    ST_ONE_TWO_SYM_LEX_2,
     /* '>', '>>', '|', '||', '&', '&&' */
-    BACKSLASH,
-    BACKSLASH_IN_QUOTES,
-    IN_QUOTES,
-    ERROR,
-    OTHER,
-    END_OF
+    ST_BACKSLASH,
+    ST_BACKSLASH_IN_QUOTES,
+    ST_IN_QUOTES,
+    ST_ERROR,
+    ST_WORD,
+    ST_EOLN_EOF
 } lexer_state;
 
 typedef struct lexer_info {
     lexer_state state;
     char c; /* current symbol */
+    unsigned int get_next_char:1;
 } lexer_info;
 
 void init_lexer (lexer_info *info);
-lexeme *get_lex(lexer_info *info);
+lexeme *get_lex (lexer_info *info);
 
 #endif
