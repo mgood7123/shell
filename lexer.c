@@ -190,7 +190,7 @@ lexeme *get_lex (lexer_info *info)
                 add_to_buffer (&buf, info->c);
                 deferred_get_char (info);
             } else if (buf.count_sym == 1) {
-                /* TODO: make it more pretty *;
+                /* TODO: make it more pretty */
                 char prev_c = get_last_from_buffer (&buf);
                 clear_buffer (&buf);
                 switch (prev_c) {
