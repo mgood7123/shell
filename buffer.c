@@ -73,12 +73,27 @@ char *convert_to_string (buffer *buf, int destroy_me)
         current = next;
     }
 
+    if (destroy_me) {
+        buf->last_block = buf->first_block = NULL;
+        buf->count_sym = 0;
+    }
+
     *cur_sym_to = '\0';
     return str;
 }
 
+/* Returns -1, if buffer empty */
+int get_last_from_buffer (buffer *buf)
+{
+    if (buf->last_block == NULL)
+        return -1;
+    return *(buf->last_block->str +
+            ((buf->count_sym - 1) % BLOCK_SIZE));
+}
+
 /*
 #include <stdio.h>
+#define DEBUG_BUFFER_VAR1
 int main() {
     int c;
     char *str;
@@ -91,10 +106,18 @@ int main() {
                 break;
             add_to_buffer (&buf, c);
         } while (1);
+#ifdef DEBUG_BUFFER_VAR1
         str = convert_to_string (&buf, 0);
-        printf ("[%s]\n", str);
+        printf ("[%s]\nLast sym: %c.\n",
+                str, get_last_from_buffer (&buf));
+#else
+        str = convert_to_string (&buf, 1);
+        printf ("[%s]\n.", str);
+#endif
         free (str);
+#ifdef DEBUG_BUFFER_VAR1
         clear_buffer (&buf);
+#endif
     } while (c != EOF);
     return 0;
 }
