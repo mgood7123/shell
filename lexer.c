@@ -234,14 +234,12 @@ lexeme *get_lex (lexer_info *info)
             switch (info->c) {
             case EOF:
                 info->state = ST_ERROR;
-                break;
-            case ' ':
-            case '\"':
-            case '\\':
-                add_to_buffer (&buf, info->c);
+                continue;
             case '\n':
                 /* Ignore newline symbol */
                 break;
+/* Non bash-like behaviour. In bash substitution
+ * makes in $'string' costruction. */
             case 'a':
                 add_to_buffer (&buf, '\a');
                 break;
@@ -264,9 +262,8 @@ lexeme *get_lex (lexer_info *info)
                 add_to_buffer (&buf, '\v');
                 break;
             default:
-                /* Substitution not found */
-                add_to_buffer (&buf, '\\');
                 add_to_buffer (&buf, info->c);
+                break;
             }
             deferred_get_char (info);
             info->state = ST_WORD;
@@ -277,10 +274,19 @@ lexeme *get_lex (lexer_info *info)
             print_state ("ST_BACKSLASH_IN_QUOTES", info->c);
 #endif
 
-            /* TODO: what different from ST_BACKSLASH? */
-            /* Probably, absolutelly identical ST_BACKSLASH,
-             * but: info->state = ST_IN_QUOTES */
-            /* Currently backslash ignored */
+            switch (info->c) {
+            case EOF:
+                info->state = ST_ERROR;
+                break;
+            case '\"':
+                add_to_buffer (&buf, info->c);
+                break;
+            default:
+                add_to_buffer (&buf, '\\');
+                add_to_buffer (&buf, info->c);
+                break;
+            }
+            deferred_get_char (info);
             info->state = ST_IN_QUOTES;
             break;
 
@@ -292,7 +298,7 @@ lexeme *get_lex (lexer_info *info)
             switch (info->c) {
             case EOF:
                 info->state = ST_ERROR;
-                break;
+                continue;
             case '\\':
                 deferred_get_char (info);
                 info->state = ST_BACKSLASH_IN_QUOTES;
@@ -324,7 +330,7 @@ lexeme *get_lex (lexer_info *info)
             case '>':
             case '|':
             case '&':
-            case '`':
+/*            case '`': */
                 info->state = ST_START;
                 lex = make_lex (LEX_WORD);
                 lex->str = convert_to_string (&buf, 1);
@@ -346,6 +352,10 @@ lexeme *get_lex (lexer_info *info)
 
         case ST_ERROR:
             print_state ("ST_ERROR", info->c);
+            clear_buffer (&buf);
+            info->get_next_char = 0;
+            info->state = ST_START;
+            /* TODO: read to '\n' or EOF */
             break;
 
         case ST_EOLN_EOF:
