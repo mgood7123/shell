@@ -390,3 +390,29 @@ lexeme *get_lex (lexer_info *linfo)
         }
     } while (1);
 }
+
+/*
+$ gcc -g -Wall -ansi -pedantic -c buffer.c -o buffer.o
+$ gcc -g -Wall -ansi -pedantic lexer.c buffer.o -o lexer
+*/
+
+/*
+int main ()
+{
+    lexer_info linfo;
+    init_lexer (&linfo);
+
+    do {
+        lexeme *lex = get_lex (&linfo);
+        print_lex (lex);
+        if (lex->type == LEX_EOFILE)
+            return 0;
+        destroy_lex (lex);
+
+        if (linfo.state == ST_ERROR) {
+            fprintf(stderr, "(>_<)\n");
+            continue;
+        }
+    } while (1);
+}
+*/
