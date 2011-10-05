@@ -25,49 +25,48 @@ void print_state (const char *state_name, int c)
 
 void print_lex (lexeme *lex)
 {
-    printf ("!!! Lexeme: ");
     switch (lex->type) {
     case LEX_INPUT:         /* '<'  */
-        printf ("[<]\n");
+        printf (" [<]");
         break;
     case LEX_OUTPUT:        /* '>'  */
-        printf ("[>]\n");
+        printf (" [>]");
         break;
     case LEX_APPEND:        /* '>>' */
-        printf ("[>>]\n");
+        printf (" [>>]");
         break;
     case LEX_PIPE:          /* '|'  */
-        printf ("[|]\n");
+        printf (" [|]");
         break;
     case LEX_OR:            /* '||' */
-        printf ("[||]\n");
+        printf (" [||]");
         break;
     case LEX_BACKGROUND:    /* '&'  */
-        printf ("[&]\n");
+        printf (" [&]");
         break;
     case LEX_AND:           /* '&&' */
-        printf ("[&&]\n");
+        printf (" [&&]");
         break;
     case LEX_SEMICOLON:     /* ';'  */
-        printf ("[;]\n");
+        printf (" [;]");
         break;
     case LEX_BRACKET_OPEN:  /* '('  */
-        printf ("[(]\n");
+        printf (" [(]");
         break;
     case LEX_BRACKET_CLOSE: /* ')'  */
-        printf ("[)]\n");
+        printf (" [)]");
         break;
     case LEX_REVERSE:       /* '`'  */
-        printf ("[`]\n");
+        printf (" [`]");
         break;
     case LEX_WORD:     /* all different */
-        printf ("[WORD:%s]\n", lex->str);
+        printf (" [%s]", lex->str);
         break;
     case LEX_EOLINE:        /* '\n' */
-        printf ("[EOLINE]\n");
+        printf (" [EOLINE]");
         break;
     case LEX_EOFILE:         /* EOF  */
-        printf ("[EOFILE]\n");
+        printf (" [EOFILE]");
         break;
     }
 }
@@ -390,7 +389,9 @@ lexeme *get_lex (lexer_info *linfo)
             exit (1);
             break;
         }
-    } while (1);
+    } while (linfo->state != ST_ERROR);
+
+    return NULL;
 }
 
 /*
@@ -398,23 +399,76 @@ $ gcc -g -Wall -ansi -pedantic -c buffer.c -o buffer.o
 $ gcc -g -Wall -ansi -pedantic lexer.c buffer.o -o lexer
 */
 
-/*
+typedef struct lexlist {
+	struct lexlist *next;
+	lexeme *lex;
+} lexlist;
+
+void add_to_lexlist (lexlist **list, lexlist **cur_item, lexeme *lex)
+{
+    if (*list == NULL) {
+        *cur_item = *list =
+            (lexlist *) malloc (sizeof (lexlist));
+    } else {
+        *cur_item = (*cur_item)->next =
+            (lexlist *) malloc (sizeof (lexlist));
+    }
+
+    (*cur_item)->next = NULL;
+    (*cur_item)->lex = lex;
+}
+
+void print_lexlist (lexlist *list)
+{
+    printf ("Lexemes:");
+    while (list != NULL) {
+        print_lex (list->lex);
+        list = list->next;
+    }
+    putchar ('\n');
+}
+
+void destroy_lexlist (lexlist **list, lexlist **cur_item)
+{
+    lexlist *next;
+
+    while (*list != NULL) {
+        next = (*list)->next;
+        destroy_lex ((*list)->lex);
+        free (*list);
+        *list = next;
+    }
+
+    *list = NULL;
+    *cur_item = NULL;
+}
+
 int main ()
 {
+    lexlist *cur_item = NULL, *list = NULL;
     lexer_info linfo;
     init_lexer (&linfo);
 
     do {
         lexeme *lex = get_lex (&linfo);
-        print_lex (lex);
-        if (lex->type == LEX_EOFILE)
-            return 0;
-        destroy_lex (lex);
-
-        if (linfo.state == ST_ERROR) {
+        if (lex == NULL) {
             fprintf(stderr, "(>_<)\n");
-            continue;
+            destroy_lexlist (&list, &cur_item);
+            break;
+        }
+
+        add_to_lexlist (&list, &cur_item, lex);
+        if (lex->type == LEX_EOLINE) {
+            print_lexlist (list);
+            destroy_lexlist (&list, &cur_item);
+            lex = NULL;
+        } else if (lex->type == LEX_EOFILE) {
+            print_lexlist (list);
+            destroy_lexlist (&list, &cur_item);
+            lex = NULL;
+            break;
         }
     } while (1);
+
+    return 0;
 }
-*/
