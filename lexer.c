@@ -132,6 +132,7 @@ lexeme *get_lex (lexer_info *linfo)
                 linfo->state = ST_EOLN_EOF;
                 break;
             case ' ':
+            case '\t':
                 deferred_get_char (linfo);
                 break;
             case '<':
@@ -327,6 +328,7 @@ lexeme *get_lex (lexer_info *linfo)
             case EOF:
             case '\n':
             case ' ':
+            case '\t':
             case '<':
             case ';':
             case '(':
