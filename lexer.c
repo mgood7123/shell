@@ -449,6 +449,7 @@ int main ()
     lexer_info linfo;
     init_lexer (&linfo);
 
+    printf ("$ ");
     do {
         lexeme *lex = get_lex (&linfo);
         if (lex == NULL) {
@@ -462,6 +463,7 @@ int main ()
             print_lexlist (list);
             destroy_lexlist (&list, &cur_item);
             lex = NULL;
+            printf ("$ ");
         } else if (lex->type == LEX_EOFILE) {
             print_lexlist (list);
             destroy_lexlist (&list, &cur_item);
