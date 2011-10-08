@@ -362,7 +362,7 @@ lexeme *get_lex (lexer_info *linfo)
             linfo->get_next_char = 0;
             linfo->state = ST_START;
             /* TODO: read to '\n' or EOF */
-            break;
+            return NULL;
 
         case ST_EOLN_EOF:
 #ifdef DEBUG_LEXER
