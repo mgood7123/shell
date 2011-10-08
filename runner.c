@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <string.h>
 
+#define TERM_DESC STDIN_FILENO
+
 int cd_to_path(char *str)
 {
 	int status = chdir(str);

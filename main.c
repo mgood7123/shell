@@ -1,4 +1,4 @@
-#include "common.h"
+#include "types.h"
 #include "lexer.h"
 /* #include "runner.h" */
 
@@ -16,24 +16,24 @@
 char **global_envp;
 pid_t shell_pgid;
 
-void set_sig_ign(void)
+void set_sig_ign (void)
 {
-	signal(SIGINT, SIG_IGN);
-	signal(SIGQUIT, SIG_IGN);
-	signal(SIGTSTP, SIG_IGN);
-	signal(SIGTTIN, SIG_IGN);
-	signal(SIGTTOU, SIG_IGN);
-	signal(SIGCHLD, SIG_IGN);
+    signal (SIGINT, SIG_IGN);
+    signal (SIGQUIT, SIG_IGN);
+    signal (SIGTSTP, SIG_IGN);
+    signal (SIGTTIN, SIG_IGN);
+    signal (SIGTTOU, SIG_IGN);
+    signal (SIGCHLD, SIG_IGN);
 }
 
 void set_sig_dfl(void)
 {
-	signal(SIGINT, SIG_DFL);
-	signal(SIGQUIT, SIG_DFL);
-	signal(SIGTSTP, SIG_DFL);
-	signal(SIGTTIN, SIG_DFL);
-	signal(SIGTTOU, SIG_DFL);
-	signal(SIGCHLD, SIG_DFL);
+    signal (SIGINT, SIG_DFL);
+    signal (SIGQUIT, SIG_DFL);
+    signal (SIGTSTP, SIG_DFL);
+    signal (SIGTTIN, SIG_DFL);
+    signal (SIGTTOU, SIG_DFL);
+    signal (SIGCHLD, SIG_DFL);
 }
 */
 
@@ -48,103 +48,103 @@ void set_sig_dfl(void)
 /* Note: this is not check for
  * interactively/background runned shell. */
 /*
-void init_shell(char **envp)
+void init_shell (char **envp)
 {
-	char *pwd;
+    char *pwd;
 
-	global_envp = envp;
+    global_envp = envp;
 
-	pwd = getcwd(NULL, 0);
-	setenv("PWD", pwd, 1);
-	free(pwd);
+    pwd = getcwd (NULL, 0);
+    setenv ("PWD", pwd, 1);
+    free (pwd);
 
-	umask(S_IWGRP | S_IWOTH);
+    umask (S_IWGRP | S_IWOTH);
 
-	set_sig_ign();
+    set_sig_ign ();
 
-	shell_pgid = getpid();
-	tcsetpgrp(STDIN_FILENO, shell_pgid);
+    shell_pgid = getpid ();
+    tcsetpgrp (STDIN_FILENO, shell_pgid);
 }
 
-void print_prompt1(void)
+void print_prompt1 (void)
 {
-	char *ps1 = getenv("PS1");
-	char *user = getenv("USER");
-	char *pwd = getenv("PWD");
+    char *ps1 = getenv("PS1");
+    char *user = getenv("USER");
+    char *pwd = getenv("PWD");
 
-	if (ps1) {
-		printf("%s", ps1);
-		return;
-	}
+    if (ps1) {
+        printf ("%s", ps1);
+        return;
+    }
 
-	if (user)
-		printf("%s ", user);
-	if (pwd) {
-		char *directory;
-		if (strcmp(pwd, "/")) {
-			while (*pwd)
-				if (*(pwd++) == '/')
-					directory = pwd;
-		} else
-			directory = pwd;
-		printf("%s ", directory);
-	}
+    if (user)
+        printf ("%s ", user);
+    if (pwd) {
+        char *directory;
+        if (strcmp (pwd, "/")) {
+            while (*pwd)
+                if (*(pwd++) == '/')
+                    directory = pwd;
+        } else
+            directory = pwd;
+        printf ("%s ", directory);
+    }
 
-	if (user)
-		printf("%s ", strcmp(user, "root") ? "$" : "#");
-	else
-		printf("%s ", "$");
+    if (user)
+        printf ("%s ", strcmp(user, "root") ? "$" : "#");
+    else
+        printf ("%s ", "$");
 }
 
-void print_prompt2(void)
+void print_prompt2 (void)
 {
-	char *ps2 = getenv("PS2");
+    char *ps2 = getenv ("PS2");
 
-	if (ps2) {
-		printf("%s", ps2);
-		return;
-	}
+    if (ps2) {
+        printf ("%s", ps2);
+        return;
+    }
 
-	printf("%s ", ">");
+    printf ("%s ", ">");
 }
 
-void print_set()
+void print_set ()
 {
-	char **envp = global_envp;
-	if (!envp)
-		return;
+    char **envp = global_envp;
+    if (!envp)
+        return;
 
-	while (*envp)
-		printf("%s\n", *(envp++));
+    while (*envp)
+        printf ("%s\n", *(envp++));
 }
 */
 
-int main(int argc, char **argv, char **envp)
+int main (int argc, char **argv, char **envp)
 {
-	lexer_info lexer_info;
+    lexer_info lexer_info;
     init_lexer (&lexer_info);
-/*	signal(SIGINT, SIG_IGN);  TODO: not ignore, continue main do..while */
+/*    signal(SIGINT, SIG_IGN);  TODO: not ignore, continue main do..while */
 
-/*	init_shell(envp);*/
+/*    init_shell(envp);*/
 
-	do {
+    do {
         lexeme *lex = get_lex (&lexer_info);
         print_lex (lex);
         if (lex->type == LEX_EOFILE)
             return 0;
         destroy_lex (lex);
 
-		if (lexer_info.state == ST_ERROR) {
-			fprintf(stderr, "(>_<)\n");
-			continue;
-		}
+        if (lexer_info.state == ST_ERROR) {
+            fprintf(stderr, "(>_<)\n");
+            continue;
+        }
 
-/*		signal(SIGINT, SIG_DFL);  TODO: kill fg process */
-/*		run_command(cmd); */
-/*		signal(SIGINT, SIG_IGN);*/
+/*        signal(SIGINT, SIG_DFL);  TODO: kill fg process */
+/*        run_command(cmd); */
+/*        signal(SIGINT, SIG_IGN);*/
 
-/*		dispose_command(cmd); */
-	} while (1);
+/*        dispose_command(cmd); */
+    } while (1);
 
-	return 0;
+    return 0;
 }
