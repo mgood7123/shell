@@ -92,7 +92,7 @@ int get_last_from_buffer (buffer *buf)
 }
 
 /*
-$ gcc -g -Wall -ansi -pedantic buffer.c -o buffer
+gcc -g -Wall -ansi -pedantic buffer.c -o buffer
 */
 
 /*

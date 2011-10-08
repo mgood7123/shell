@@ -394,8 +394,8 @@ lexeme *get_lex (lexer_info *linfo)
 }
 
 /*
-$ gcc -g -Wall -ansi -pedantic -c buffer.c -o buffer.o
-$ gcc -g -Wall -ansi -pedantic lexer.c buffer.o -o lexer
+gcc -g -Wall -ansi -pedantic -c buffer.c -o buffer.o &&
+gcc -g -Wall -ansi -pedantic lexer.c buffer.o -o lexer
 */
 
 /*

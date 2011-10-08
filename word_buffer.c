@@ -92,7 +92,7 @@ void destroy_argv (char **argv)
 }
 
 /*
-$ gcc -g -Wall -ansi -pedantic word_buffer.c -o word_buffer
+gcc -g -Wall -ansi -pedantic word_buffer.c -o word_buffer
 */
 
 /*
