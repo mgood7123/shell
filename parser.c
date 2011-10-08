@@ -28,7 +28,7 @@ typedef enum type_of_relation {
 typedef struct cmd_list_item {
     /* Item data: */
     struct cmd_pipeline *cmd_pl;
-    struct cmd_list *cmd_lst;
+/*    struct cmd_list *cmd_lst;*/
     type_of_relation rel;
     /* End of item data */
     struct cmd_list_item *next;
@@ -55,7 +55,7 @@ void init_parser (parser_info *pinfo)
 void parser_get_lex (parser_info *pinfo)
 {
     if (pinfo->cur_lex != NULL)
-        destroy_lex (pinfo->cur_lex)
+        free (pinfo->cur_lex); /* do not freeing string */
     pinfo->cur_lex = get_lex (pinfo->linfo);
 }
 
@@ -72,9 +72,40 @@ void parser_get_lex (parser_info *pinfo)
     return simple_cmd;
 }
 
+*cmd_pipeline make_cmd_pipeline ()
+{
+    cmd_pipeline *pipeline =
+        (cmd_pipeline *) malloc (sizeof (cmd_pipeline));
+    pipeline->input = NULL;
+    pipeline->output = NULL;
+    pipeline->append = 0;
+    pipeline->first_item = NULL
+    return pipeline;
+}
+
+*cmd_list_item make_cmd_list_item ()
+{
+    cmd_list_item *list_item =
+        (cmd_list_item *) malloc (sizeof (cmd_list_item));
+    list_item->pl = NULL;
+    list_item->relation = REL_BOTH;
+    list_item->next = NULL;
+    return list_item;
+}
+
+*cmd_list make_cmd_list ()
+{
+    cmd_list *list =
+        (cmd_list *) malloc (sizeof (cmd_list));
+    list->foreground = 1;
+    list->first_item = NULL;
+    return list;
+}
+
 /* TODO
  * 1. Проверки (input и output), один ли раз было перенаправление
- * этого типа. */
+ * этого типа.
+ * 2. Подумать над редиректами до имени команды. */
 *cmd_pipeline_item parse_cmd_pipeline_item (parser_info *pinfo)
 {
     cmd_pipeline_item *simple_cmd = make_simple_cmd ();
@@ -125,77 +156,101 @@ void parser_get_lex (parser_info *pinfo)
 }
 
 /* TODO:
- * ловить некорректные редирректы
+ * 1. Обработка ошибок парсинга item'ов
+ * 2. ловить некорректные редирректы
  * Корректные: на вход в первом simple cmd, на выход в последнем.
  */
 *cmd_pipeline parse_cmd_pipeline (parser_info *pinfo)
 {
-    cmd_pipeline_item *list = parse_cmd_pipeline_item (pinfo);
-    cmd_pipeline_item *cur_item = list;
+    cmd_pipeline *pipeline = make_cmd_pipeline ();
+    cmd_pipeline_item *cur_item = NULL, *tmp_item == NULL;
 
     do {
-        switch (pinfo->cur_lex->type) {
-        case LEX_PIPE:
+        if (pinfo->cur_lex->type == LEX_WORD) {
+            tmp_item = parse_cmd_pipeline_item (pinfo);
+        } else if (pinfo->cur_lex->type == LEX_BRACKET_OPEN) {
             parser_get_lex (pinfo);
-            /* Make new item */
-            break;
-        default:
-            /* make argv from strlist */
-            return list;
+            tmp_item = make_cmd_pipeline_item ();
+            cur_item->cmd_lst = parse_cmd_list (pinfo);
+            if (pinfo->cur_lex->type == LEX_BRACKET_CLOSE) {
+                parser_get_lex (pinfo);
+            } else {
+                /* TODO: error */
+            }
+        } else {
+            /* TODO: error */
+        }
+
+        /* TODO: processing errors */
+
+        if (pipeline->first_item == NULL) {
+            /* First simple cmd */
+            pipeline->first_item = cur_item = tmp_item;
+        } else {
+            cur_item = cur_item->next = tmp_item;
+        }
+
+        if (pinfo->cur_lex->type == LEX_PIPE) {
+            parser_get_lex (pinfo);
+            continue;
+        } else {
+            return pipeline;
         }
     } while (1);
 }
 
 *cmd_list_item parse_cmd_list_item (parser_info *pinfo)
 {
-    parser_get_lex (pinfo->linfo);
+    cmd_list_item *list_item = make_cmd_list_item ();
+    list->item->pl = parse_cmd_pipeline (pinfo);
+    /* TODO: processing errors */
     switch (pinfo->cur_lex->type) {
-    case LEX_INPUT:         /* '<'  */
-    case LEX_OUTPUT:        /* '>'  */
-    case LEX_APPEND:        /* '>>' */
-    case LEX_PIPE:          /* '|'  */
-    case LEX_OR:            /* '||' */
-    case LEX_BACKGROUND:    /* '&'  */
-    case LEX_AND:           /* '&&' */
-    case LEX_SEMICOLON:     /* ';'  */
-    case LEX_BRACKET_CLOSE: /* ')'  */
-        /* Error */
+    case LEX_OR:
+        list->item->rel = REL_OR;
         break;
-    case LEX_BRACKET_OPEN:  /* '('  */
+    case LEX_AND:
+        list->item->rel = REL_AND;
         break;
-    case LEX_REVERSE:       /* '`'  */
+    case LEX_SEMICOLON:
+        list->item->rel = REL_BOTH;
         break;
-    case LEX_WORD:     /* all different */
-        /* todo: make pipeline */
-        break;
-    case LEX_EOLINE:        /* '\n' */
-        break;
-    case LEX_EOFILE:         /* EOF  */
-        break;
+    default:
+        /* TODO: error */
+        free (list_item);
+        return NULL;
     }
+
+    get_next_lex ();
+    return list_item;
 }
 
 *cmd_list parse_cmd_list (parser_info *pinfo)
 {
-    /* TODO:
-    malloc cmd_list;
-    cmd_list->first_item = parse_cmd_list_item (pinfo);
-    cmd_list->foregroung = 1;
-    switch (pinfo->cur_lex->type) {
-    case LEX_BACKGROUND:
-        cmd_list->foreground = 0;
-        parse_get_lex (pinfo);
-        break;
-    case LEX_SEMICOLON:
-        parse_get_lex (pinfo);
-        break;
-    case LEX_BRACKET_CLOSE:
-        * TODO: We begin with open bracket? *
-        parse_get_lex (pinfo);
-        break;
-    default:
-        * No actions *
-        break;
-    }
-    */
+    cmd_list *list = make_cmd_list (pinfo);
+    cmd_list_item *cur_item = NULL, *tmp_item = NULL;
+
+    do {
+        tmp_item = parse_cmd_list_item (pinfo);
+        /* TODO: error */
+        if (list->first_item == NULL)
+            list->first_item = cur_item = tmp_item;
+        else
+            cur_item = cur_item->next = tmp_item;
+
+        if (pinfo->cur_lex->type == LEX_BACKGROUND) {
+            cmd_list->foreground = 0;
+            parse_get_lex (pinfo);
+        }
+
+        switch (pinfo->cur_lex->type) {
+        case LEX_BRACKET_CLOSE:
+        case LEX_EOLINE:
+        case LEX_EOFILE:
+            return list;
+        default:
+            /* TODO: error */
+            /* frees */
+            return NULL;
+        }
+    } while (1);
 }
