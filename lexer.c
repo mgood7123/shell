@@ -371,10 +371,10 @@ lexeme *get_lex (lexer_info *linfo)
 
             switch (linfo->c) {
             case '\n':
-                lex = make_lex(LEX_EOLINE);
+                lex = make_lex (LEX_EOLINE);
                 break;
             case EOF:
-                lex = make_lex(LEX_EOFILE);
+                lex = make_lex (LEX_EOFILE);
                 break;
             default:
                 fprintf (stderr, "Lexer: error in ST_EOLN_EOF;");
