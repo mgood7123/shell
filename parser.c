@@ -5,9 +5,9 @@
 typedef struct cmd_pipeline_item {
     /* Item data: */
     char **argv;
-    char *input;
-    char *output;
-    unsigned int append:1;
+    char *input;  /* temporally */
+    char *output; /* temporally */
+    unsigned int append:1; /* temporally */
     struct cmd_list *cmd_lst;
     /* End of item data */
     struct cmd_pipeline_item *next;
@@ -115,6 +115,79 @@ cmd_list *make_cmd_list ()
     return list;
 }
 
+void print_cmd_list (FILE *stream, cmd_list *list);
+
+void print_cmd_pipeline (FILE *stream, cmd_pipeline *pipeline)
+{
+    cmd_pipeline_item *current;
+
+    if (pipeline == NULL) {
+        fprintf (stream, "NULL_PIPELINE");
+        return;
+    }
+
+    current = pipeline->first_item;
+    while (current != NULL) {
+        if (current->cmd_lst == NULL) {
+            print_argv (stream, current->argv);
+        } else {
+            fprintf (stream, "(");
+            print_cmd_list (stream, current->cmd_lst);
+            fprintf (stream, ")");
+        }
+        if (current->next != NULL)
+            fprintf (stream, " | ");
+        current = current->next;
+    }
+
+    if (pipeline->input != NULL) {
+        fprintf (stream, " < [%s]", pipeline->input);
+    }
+    if (pipeline->output != NULL) {
+        if (pipeline->append)
+            fprintf (stream, " >> [%s]", pipeline->output);
+        else
+            fprintf (stream, " > [%s]", pipeline->output);
+    }
+}
+
+void print_relation (FILE *stream, type_of_relation rel) {
+    switch (rel) {
+    case REL_OR:
+        fprintf (stream, " || ");
+        break;
+    case REL_AND:
+        fprintf (stream, " && ");
+        break;
+    case REL_BOTH:
+        fprintf (stream, " ; ");
+        break;
+    case REL_NONE:
+        /* No actions */
+        break;
+    }
+}
+
+void print_cmd_list (FILE *stream, cmd_list *list)
+{
+    cmd_list_item *current;
+
+    if (list == NULL) {
+        fprintf (stream, "[NULL_CMD_LIST]\n");
+        return;
+    }
+
+    current = list->first_item;
+    while (current != NULL) {
+        print_cmd_pipeline (stream, current->pl);
+        print_relation (stream, current->rel);
+        current = current->next;
+    }
+
+    if (!list->foreground)
+        fprintf (stream, "&");
+}
+
 void destroy_cmd_list (cmd_list *list);
 
 void destroy_cmd_pipeline (cmd_pipeline *pipeline)
@@ -158,7 +231,6 @@ void destroy_cmd_list (cmd_list *list)
     }
 
     free (list);
-
 }
 
 /* TODO
@@ -242,6 +314,7 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated);
 
 /* TODO: clear input/output pointers in cmd_pipeline_item
  * at parsing cmd_pipeline */
+/* Ловить точку с запятой в конце, менять тип на REL_NONE */
 /* TODO:
  * ловить некорректные редирректы
  * Корректные: на вход в первом simple cmd, на выход в последнем.
@@ -409,7 +482,8 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
 
     /* Error processing */
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: error #%d in parse_cmd_list ();\n", error);
+    fprintf (stderr, "Parser: error #%d in parse_cmd_list (pinfo, %d); ",
+        error, bracket_terminated);
     print_lex (stderr, pinfo->cur_lex);
 #endif
     destroy_cmd_list (list);
@@ -436,6 +510,7 @@ int main ()
             fprintf (stderr, "Parser: error;\n");
             return 1;
         }
+        print_cmd_list (stdout, list);
     } while (1);
 
     return 0;
