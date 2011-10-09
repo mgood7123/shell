@@ -1,7 +1,6 @@
 #include "lexer.h"
 
 #include "buffer.h"
-#include <stdio.h>
 #include <stdlib.h>
 
 /* #define LEXER_DEBUG */
@@ -23,51 +22,51 @@ void print_state (const char *state_name, int c)
     }
 }
 
-void print_lex (lexeme *lex)
+void print_lex (FILE *stream, lexeme *lex)
 {
-    printf ("!!! Lexeme: ");
+    fprintf (stream, "!!! Lexeme: ");
     switch (lex->type) {
     case LEX_INPUT:         /* '<'  */
-        printf ("[<]\n");
+        fprintf (stream, "[<]\n");
         break;
     case LEX_OUTPUT:        /* '>'  */
-        printf ("[>]\n");
+        fprintf (stream, "[>]\n");
         break;
     case LEX_APPEND:        /* '>>' */
-        printf ("[>>]\n");
+        fprintf (stream, "[>>]\n");
         break;
     case LEX_PIPE:          /* '|'  */
-        printf ("[|]\n");
+        fprintf (stream, "[|]\n");
         break;
     case LEX_OR:            /* '||' */
-        printf ("[||]\n");
+        fprintf (stream, "[||]\n");
         break;
     case LEX_BACKGROUND:    /* '&'  */
-        printf ("[&]\n");
+        fprintf (stream, "[&]\n");
         break;
     case LEX_AND:           /* '&&' */
-        printf ("[&&]\n");
+        fprintf (stream, "[&&]\n");
         break;
     case LEX_SEMICOLON:     /* ';'  */
-        printf ("[;]\n");
+        fprintf (stream, "[;]\n");
         break;
     case LEX_BRACKET_OPEN:  /* '('  */
-        printf ("[(]\n");
+        fprintf (stream, "[(]\n");
         break;
     case LEX_BRACKET_CLOSE: /* ')'  */
-        printf ("[)]\n");
+        fprintf (stream, "[)]\n");
         break;
     case LEX_REVERSE:       /* '`'  */
-        printf ("[`]\n");
+        fprintf (stream, "[`]\n");
         break;
     case LEX_WORD:     /* all different */
-        printf ("[WORD:%s]\n", lex->str);
+        fprintf (stream, "[WORD:%s]\n", lex->str);
         break;
     case LEX_EOLINE:        /* '\n' */
-        printf ("[EOLINE]\n");
+        fprintf (stream, "[EOLINE]\n");
         break;
-    case LEX_EOFILE:         /* EOF  */
-        printf ("[EOFILE]\n");
+    case LEX_EOFILE:        /* EOF  */
+        fprintf (stream, "[EOFILE]\n");
         break;
     }
 }
@@ -406,7 +405,7 @@ int main ()
 
     do {
         lexeme *lex = get_lex (&linfo);
-        print_lex (lex);
+        print_lex (stdout, lex);
         if (lex->type == LEX_EOFILE)
             return 0;
         destroy_lex (lex);

@@ -47,6 +47,8 @@ typedef struct lexer_info {
 void init_lexer (lexer_info *info);
 lexeme *get_lex (lexer_info *info);
 void destroy_lex (lexeme *lex);
-void print_lex (lexeme *lex);
+
+#include <stdio.h>
+void print_lex (FILE *stream, lexeme *lex);
 
 #endif
