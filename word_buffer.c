@@ -91,26 +91,23 @@ void destroy_argv (char **argv)
     free (argv);
 }
 
+void print_argv (FILE *stream, char **argv)
+{
+    if (argv == NULL)
+        return;
+
+    while (*argv != NULL) {
+        fprintf (stream, "[%s]", *argv);
+        if (*(++argv) != NULL)
+            fprintf (stream, " ");
+    }
+}
+
 /*
 gcc -g -Wall -ansi -pedantic word_buffer.c -o word_buffer
 */
 
 /*
-#include <stdio.h>
-
-void print_argv (char **argv)
-{
-    if (argv == NULL)
-        return;
-
-    printf ("My argv:");
-    while (*argv != NULL) {
-        printf (" [%s]", *argv);
-        ++argv;
-    }
-    putchar ('\n');
-}
-
 #define DEBUG_WORD_BUFFER_VAR 1
 int main (int argc, char **argv) {
     char **cur_argv;

@@ -19,4 +19,7 @@ char **convert_to_argv (word_buffer *wbuf, int destroy_me);
 char *get_last_word (word_buffer *wbuf);
 void destroy_argv (char **argv);
 
+#include <stdio.h>
+void print_argv (FILE *stream, char **argv);
+
 #endif
