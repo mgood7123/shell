@@ -115,7 +115,7 @@ cmd_list *make_cmd_list ()
     return list;
 }
 
-void print_cmd_list (FILE *stream, cmd_list *list);
+void print_cmd_list (FILE *stream, cmd_list *list, int newline);
 
 void print_cmd_pipeline (FILE *stream, cmd_pipeline *pipeline)
 {
@@ -132,7 +132,7 @@ void print_cmd_pipeline (FILE *stream, cmd_pipeline *pipeline)
             print_argv (stream, current->argv);
         } else {
             fprintf (stream, "(");
-            print_cmd_list (stream, current->cmd_lst);
+            print_cmd_list (stream, current->cmd_lst, 0);
             fprintf (stream, ")");
         }
         if (current->next != NULL)
@@ -168,7 +168,7 @@ void print_relation (FILE *stream, type_of_relation rel) {
     }
 }
 
-void print_cmd_list (FILE *stream, cmd_list *list)
+void print_cmd_list (FILE *stream, cmd_list *list, int newline)
 {
     cmd_list_item *current;
 
@@ -186,6 +186,8 @@ void print_cmd_list (FILE *stream, cmd_list *list)
 
     if (!list->foreground)
         fprintf (stream, "&");
+    if (newline)
+        fprintf (stream, "\n");
 }
 
 void destroy_cmd_list (cmd_list *list);
@@ -338,11 +340,14 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
             break;
         case LEX_BRACKET_OPEN:
             /* TODO: переместить считывание
-             * открывающей скобки в parse_cmd_list */
+             * открывающей скобки в parse_cmd_list.
+             * Нужно ли? */
             parser_get_lex (pinfo);
             tmp_item = make_cmd_pipeline_item ();
             tmp_item->cmd_lst = parse_cmd_list (pinfo, 1);
             error = (tmp_item->cmd_lst == NULL) ? 3 : 0;
+            if (!error)
+                parser_get_lex (pinfo);
             break;
         default:
             error = 4;
@@ -469,15 +474,28 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
             continue;
         }
 
-        if (!error) {
-            parser_get_lex (pinfo);
-#ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: leaving from parse_cmd_list (pinfo, %d); ",
-        bracket_terminated);
-    print_lex (stderr, pinfo->cur_lex);
-#endif
-            return list;
+        switch (cur_item->rel) {
+        case REL_NONE:
+            /* Do nothing */
+            break;
+        case REL_BOTH:
+            cur_item->rel = REL_NONE;
+            break;
+        case REL_OR:
+        case REL_AND:
+            error = 5;
+            break;
         }
+
+        if (error)
+            continue;
+
+#ifdef PARSER_DEBUG
+        fprintf (stderr, "Parser: leaving from parse_cmd_list (pinfo, %d); ",
+            bracket_terminated);
+        print_lex (stderr, pinfo->cur_lex);
+#endif
+        return list;
     }
 
     /* Error processing */
@@ -509,8 +527,13 @@ int main ()
         if (list == NULL) {
             fprintf (stderr, "Parser: error;\n");
             return 1;
+        } else if (pinfo.cur_lex->type == LEX_EOFILE) {
+            print_cmd_list (stdout, list, 1);
+            return 0;
+        } else {
+            print_cmd_list (stdout, list, 1);
+            parser_get_lex (&pinfo);
         }
-        print_cmd_list (stdout, list);
     } while (1);
 
     return 0;
