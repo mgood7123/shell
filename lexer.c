@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* #define DEBUG_LEXER */
+/* #define LEXER_DEBUG */
 
 void print_state (const char *state_name, int c)
 {
@@ -122,7 +122,7 @@ lexeme *get_lex (lexer_info *linfo)
 
         switch (linfo->state) {
         case ST_START:
-#ifdef DEBUG_LEXER
+#ifdef LEXER_DEBUG
             print_state ("ST_START", linfo->c);
 #endif
 
@@ -156,7 +156,7 @@ lexeme *get_lex (lexer_info *linfo)
             break;
 
         case ST_ONE_SYM_LEX:
-#ifdef DEBUG_LEXER
+#ifdef LEXER_DEBUG
             print_state ("ST_ONE_SYM_LEX", linfo->c);
 #endif
 
@@ -187,7 +187,7 @@ lexeme *get_lex (lexer_info *linfo)
             return lex;
 
         case ST_ONE_TWO_SYM_LEX:
-#ifdef DEBUG_LEXER
+#ifdef LEXER_DEBUG
             print_state ("ST_ONE_TWO_SYM_LEX", linfo->c);
 #endif
 
@@ -232,7 +232,7 @@ lexeme *get_lex (lexer_info *linfo)
 
 
         case ST_BACKSLASH:
-#ifdef DEBUG_LEXER
+#ifdef LEXER_DEBUG
             print_state ("ST_BACKSLASH", linfo->c);
 #endif
 
@@ -275,7 +275,7 @@ lexeme *get_lex (lexer_info *linfo)
             break;
 
         case ST_BACKSLASH_IN_QUOTES:
-#ifdef DEBUG_LEXER
+#ifdef LEXER_DEBUG
             print_state ("ST_BACKSLASH_IN_QUOTES", linfo->c);
 #endif
 
@@ -296,7 +296,7 @@ lexeme *get_lex (lexer_info *linfo)
             break;
 
         case ST_IN_QUOTES:
-#ifdef DEBUG_LEXER
+#ifdef LEXER_DEBUG
             print_state ("ST_IN_QUOTES", linfo->c);
 #endif
 
@@ -320,7 +320,7 @@ lexeme *get_lex (lexer_info *linfo)
             break;
 
         case ST_WORD:
-#ifdef DEBUG_LEXER
+#ifdef LEXER_DEBUG
             print_state ("ST_WORD", linfo->c);
 #endif
 
@@ -365,7 +365,7 @@ lexeme *get_lex (lexer_info *linfo)
             return NULL;
 
         case ST_EOLN_EOF:
-#ifdef DEBUG_LEXER
+#ifdef LEXER_DEBUG
             print_state ("ST_EOLN_EOF", linfo->c);
 #endif
 
