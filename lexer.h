@@ -15,7 +15,8 @@ typedef enum type_of_lex {
     LEX_REVERSE,       /* '`'  */
     LEX_WORD,     /* all different */
     LEX_EOLINE,        /* '\n' */
-    LEX_EOFILE         /* EOF  */
+    LEX_EOFILE,        /* EOF  */
+    LEX_ERROR     /* error in lexer */
 } type_of_lex;
 
 typedef struct lexeme {

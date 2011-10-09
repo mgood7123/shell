@@ -68,6 +68,9 @@ void print_lex (FILE *stream, lexeme *lex)
     case LEX_EOFILE:        /* EOF  */
         fprintf (stream, "[EOFILE]\n");
         break;
+    case LEX_ERROR:    /* error in lexer */
+        fprintf (stream, "[ERROR]\n");
+        break;
     }
 }
 
@@ -356,12 +359,13 @@ lexeme *get_lex (lexer_info *linfo)
             break;
 
         case ST_ERROR:
+            lex = make_lex (LEX_ERROR);
             print_state ("ST_ERROR", linfo->c);
             clear_buffer (&buf);
             linfo->get_next_char = 0;
             linfo->state = ST_START;
-            /* TODO: read to '\n' or EOF */
-            return NULL;
+            /* TODO: read to '\n' or EOF (flush read buffer) */
+            return lex;
 
         case ST_EOLN_EOF:
 #ifdef LEXER_DEBUG
