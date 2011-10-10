@@ -30,7 +30,6 @@ typedef enum type_of_relation {
 typedef struct cmd_list_item {
     /* Item data: */
     struct cmd_pipeline *pl;
-/*    struct cmd_list *cmd_lst;*/
     type_of_relation rel;
     /* End of item data */
     struct cmd_list_item *next;
@@ -44,13 +43,31 @@ typedef struct cmd_list {
 typedef struct parser_info {
     lexer_info *linfo;
     lexeme *cur_lex;
+    int error;
 } parser_info;
 
 #define PARSER_DEBUG
 
 #ifdef PARSER_DEBUG
+
 #include <stdio.h>
+
+void parser_print_action (parser_info *pinfo, const char *where, int leaving)
+{
+    if (leaving)
+        fprintf (stderr, "Parser: leaving from %s; ", where);
+    else
+        fprintf (stderr, "Parser: entering to %s; ", where);
+    print_lex (stderr, pinfo->cur_lex);
+}
+
 #endif
+
+void parser_print_error (parser_info *pinfo, const char *where)
+{
+    fprintf (stderr, "Parser: error #%d in %s; ", pinfo->error, where);
+    print_lex (stderr, pinfo->cur_lex);
+}
 
 void parser_get_lex (parser_info *pinfo);
 
@@ -62,7 +79,6 @@ void init_parser (parser_info *pinfo)
     pinfo->linfo = (lexer_info *) malloc (sizeof (lexer_info));
     init_lexer (pinfo->linfo);
     pinfo->cur_lex = NULL;
-    parser_get_lex (pinfo);
 }
 
 void parser_get_lex (parser_info *pinfo)
@@ -70,6 +86,10 @@ void parser_get_lex (parser_info *pinfo)
     if (pinfo->cur_lex != NULL)
         free (pinfo->cur_lex); /* do not freeing string */
     pinfo->cur_lex = get_lex (pinfo->linfo);
+    if (pinfo->cur_lex->type == LEX_ERROR) /* Error 1 */
+        pinfo->error = 1;
+    else
+        pinfo->error = 0; /* Error 0: all right */
 }
 
 cmd_pipeline_item *make_cmd_pipeline_item ()
@@ -203,7 +223,7 @@ void destroy_cmd_pipeline (cmd_pipeline *pipeline)
     current = pipeline->first_item;
     while (current != NULL) {
         next = current->next;
-        free (current->argv);
+        destroy_argv (current->argv);
         destroy_cmd_list (current->cmd_lst);
         free (current);
         current = next;
@@ -241,18 +261,16 @@ void destroy_cmd_list (cmd_list *list)
  * 2. Подумать над редиректами до имени команды. */
 cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
 {
-    int error = (pinfo->cur_lex->type == LEX_ERROR) ? 1 : 0;
     cmd_pipeline_item *simple_cmd = make_cmd_pipeline_item ();
     word_buffer wbuf;
     type_of_lex redirect_type; /* temporally */
     new_word_buffer (&wbuf);
 
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: entering to parse_cmd_pipeline_item (); ");
-    print_lex (stderr, pinfo->cur_lex);
+    parser_print_action (pinfo, "parse_cmd_pipeline_item ()", 0);
 #endif
 
-    while (!error) {
+    while (!pinfo->error) {
         switch (pinfo->cur_lex->type) {
         case LEX_WORD:
             /* Add to word buffer for making argv */
@@ -264,8 +282,11 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
         case LEX_APPEND:
             redirect_type = pinfo->cur_lex->type;
             parser_get_lex (pinfo);
-            error = (pinfo->cur_lex->type != LEX_WORD) ? 2 : 0;
-            if (error)
+            /* Lexer error possible */
+            if (pinfo->error)
+                continue;
+            pinfo->error = (pinfo->cur_lex->type != LEX_WORD) ? 2 : 0; /* Error 2 */
+            if (pinfo->error)
                 continue;
             switch (redirect_type) {
                 case LEX_INPUT:
@@ -286,17 +307,16 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
             parser_get_lex (pinfo);
             break;
         default:
-            error = (pinfo->cur_lex->type == LEX_ERROR) ? 3 : 0;
-            if (error)
+            /* Lexer error possible */
+            if (pinfo->error)
                 continue;
-            error = (wbuf.count_words == 0) ? 4 : 0;
-            if (error)
+            pinfo->error = (wbuf.count_words == 0) ? 3 : 0; /* Error 3 */
+            if (pinfo->error)
                 continue;
             /* make argv from word buffer */
             simple_cmd->argv = convert_to_argv (&wbuf, 1);
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: leaving from parse_cmd_pipeline_item (); ");
-    print_lex (stderr, pinfo->cur_lex);
+            parser_print_action (pinfo, "parse_cmd_pipeline_item ()", 1);
 #endif
             return simple_cmd;
         }
@@ -304,8 +324,7 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
 
     /* Error processing */
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: error #%d in parse_cmd_pipeline_item (); ", error);
-    print_lex (stderr, pinfo->cur_lex);
+    parser_print_error (pinfo, "parse_cmd_pipeline_item ()");
 #endif
     clear_word_buffer (&wbuf, 1);
     free (simple_cmd);
@@ -316,45 +335,42 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated);
 
 /* TODO: clear input/output pointers in cmd_pipeline_item
  * at parsing cmd_pipeline */
-/* Ловить точку с запятой в конце, менять тип на REL_NONE */
 /* TODO:
  * ловить некорректные редирректы
  * Корректные: на вход в первом simple cmd, на выход в последнем.
  */
 cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
 {
-    int error = (pinfo->cur_lex->type == LEX_ERROR) ? 1 : 0;
     cmd_pipeline *pipeline = make_cmd_pipeline ();
     cmd_pipeline_item *cur_item = NULL, *tmp_item = NULL;
 
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: entering to parse_cmd_pipeline (); ");
-    print_lex (stderr, pinfo->cur_lex);
+    parser_print_action (pinfo, "parse_cmd_pipeline ()", 0);
 #endif
 
-    while (!error) {
+    while (!pinfo->error) {
         switch (pinfo->cur_lex->type) {
         case LEX_WORD:
             tmp_item = parse_cmd_pipeline_item (pinfo);
-            error = (tmp_item == NULL) ? 2 : 0;
             break;
         case LEX_BRACKET_OPEN:
             /* TODO: переместить считывание
              * открывающей скобки в parse_cmd_list.
              * Нужно ли? */
             parser_get_lex (pinfo);
+            if (pinfo->error)
+                continue;
             tmp_item = make_cmd_pipeline_item ();
             tmp_item->cmd_lst = parse_cmd_list (pinfo, 1);
-            error = (tmp_item->cmd_lst == NULL) ? 3 : 0;
-            if (!error)
+            if (!pinfo->error)
                 parser_get_lex (pinfo);
             break;
         default:
-            error = 4;
+            pinfo->error = 4; /* Error 4 */
             break;
         }
 
-        if (error)
+        if (pinfo->error)
             continue;
 
         if (pipeline->first_item == NULL) {
@@ -369,8 +385,7 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
             continue;
         } else {
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: leaving from parse_cmd_pipeline (); ");
-    print_lex (stderr, pinfo->cur_lex);
+            parser_print_action (pinfo, "parse_cmd_pipeline ()", 1);
 #endif
             return pipeline;
         }
@@ -378,8 +393,7 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
 
     /* Error processing */
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: error #%d in parse_cmd_pipeline (); ", error);
-    print_lex (stderr, pinfo->cur_lex);
+    parser_print_error (pinfo, "parsercmd_pipeline ()");
 #endif
     destroy_cmd_pipeline (pipeline);
     return NULL;
@@ -390,20 +404,12 @@ cmd_list_item *parse_cmd_list_item (parser_info *pinfo)
     cmd_list_item *list_item = make_cmd_list_item ();
 
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: entering to parse_cmd_list_item (); ");
-    print_lex (stderr, pinfo->cur_lex);
+    parser_print_action (pinfo, "parse_cmd_list_item ()", 0);
 #endif
 
     list_item->pl = parse_cmd_pipeline (pinfo);
-    if (list_item->pl == NULL) {
-        /* Error processing */
-#ifdef PARSER_DEBUG
-        fprintf (stderr, "Parser: error in parse_cmd_list_item (); ");
-        print_lex (stderr, pinfo->cur_lex);
-#endif
-        free (list_item);
-        return NULL;
-    }
+    if (pinfo->error)
+        goto error;
 
     switch (pinfo->cur_lex->type) {
     case LEX_OR:
@@ -423,30 +429,36 @@ cmd_list_item *parse_cmd_list_item (parser_info *pinfo)
     if (list_item->rel != REL_NONE)
         parser_get_lex (pinfo);
 
+    if (pinfo->error)
+        goto error;
+
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: leaving from to parse_cmd_list_item (); ");
-    print_lex (stderr, pinfo->cur_lex);
+    parser_print_action (pinfo, "parse_cmd_list_item ()", 1);
 #endif
     return list_item;
+
+error:
+#ifdef PARSER_DEBUG
+    parser_print_error (pinfo, "parse_cmd_list_item ()");
+#endif
+    free (list_item);
+    return NULL;
 }
 
 cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
 {
-    int error = (pinfo->cur_lex->type == LEX_ERROR) ? 1 : 0;
     cmd_list *list = make_cmd_list (pinfo);
     cmd_list_item *cur_item = NULL, *tmp_item = NULL;
 
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: entering to parse_cmd_list (pinfo, %d); ",
-        bracket_terminated);
-    print_lex (stderr, pinfo->cur_lex);
+    parser_print_action (pinfo, "parse_cmd_list ()", 0);
 #endif
 
-    while (!error) {
+    while (!pinfo->error) {
         tmp_item = parse_cmd_list_item (pinfo);
-        error = (tmp_item == NULL) ? 2 : 0;
-        if (error)
+        if (pinfo->error)
             continue;
+
         if (list->first_item == NULL)
             list->first_item = cur_item = tmp_item;
         else
@@ -455,18 +467,20 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
         if (pinfo->cur_lex->type == LEX_BACKGROUND) {
             list->foreground = 0;
             parser_get_lex (pinfo);
+            if (pinfo->error)
+                continue;
         }
 
         switch (pinfo->cur_lex->type) {
         case LEX_BRACKET_CLOSE:
-            error = (bracket_terminated) ? 0 : 3;
-            if (error)
+            pinfo->error = (bracket_terminated) ? 0 : 5; /* Error 5 */
+            if (pinfo->error)
                 continue;
             break;
         case LEX_EOLINE:
         case LEX_EOFILE:
-            error = (bracket_terminated) ? 4 : 0;
-            if (error)
+            pinfo->error = (bracket_terminated) ? 6 : 0; /* Error 6 */
+            if (pinfo->error)
                 continue;
             break;
         default:
@@ -483,36 +497,34 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
             break;
         case REL_OR:
         case REL_AND:
-            error = 5;
+            pinfo->error = 7; /* Error 7 */
             break;
         }
 
-        if (error)
+        if (pinfo->error)
             continue;
 
 #ifdef PARSER_DEBUG
-        fprintf (stderr, "Parser: leaving from parse_cmd_list (pinfo, %d); ",
-            bracket_terminated);
-        print_lex (stderr, pinfo->cur_lex);
+        parser_print_action (pinfo, "parse_cmd_list ()", 1);
 #endif
         return list;
     }
 
     /* Error processing */
 #ifdef PARSER_DEBUG
-    fprintf (stderr, "Parser: error #%d in parse_cmd_list (pinfo, %d); ",
-        error, bracket_terminated);
-    print_lex (stderr, pinfo->cur_lex);
+    parser_print_error (pinfo, "parse_cmd_list ()");
 #endif
     destroy_cmd_list (list);
     return NULL;
 }
 
-/*
+/* Compile:
 gcc -g -Wall -ansi -pedantic -c buffer.c -o buffer.o &&
 gcc -g -Wall -ansi -pedantic -c lexer.c -o lexer.o &&
 gcc -g -Wall -ansi -pedantic -c word_buffer.c -o word_buffer.o &&
 gcc -g -Wall -ansi -pedantic parser.c buffer.o lexer.o word_buffer.o -o parser
+ * Grep possible parsing errors:
+grep -Pn '\* Error \d+ \*' parser.c
 */
 
 #include <stdio.h>
@@ -522,18 +534,23 @@ int main ()
     cmd_list *list;
     parser_info pinfo;
     init_parser (&pinfo);
+
     do {
+        parser_get_lex (&pinfo);
         list = parse_cmd_list (&pinfo, 0);
-        if (list == NULL) {
+
+        if (pinfo.error) {
+            /* TODO: flush read buffer,
+             * possibly via buffer function. */
             fprintf (stderr, "Parser: error;\n");
-            return 1;
-        } else if (pinfo.cur_lex->type == LEX_EOFILE) {
-            print_cmd_list (stdout, list, 1);
-            return 0;
         } else {
             print_cmd_list (stdout, list, 1);
-            parser_get_lex (&pinfo);
+            destroy_cmd_list (list);
+            list = NULL;
         }
+
+        if (pinfo.cur_lex->type == LEX_EOFILE)
+            exit (pinfo.error);
     } while (1);
 
     return 0;
