@@ -230,9 +230,9 @@ void destroy_cmd_pipeline (cmd_pipeline *pipeline)
     }
 
     if (pipeline->input != NULL)
-        free (current->input);
+        free (pipeline->input);
     if (pipeline->output != NULL)
-        free (current->output);
+        free (pipeline->output);
     free (pipeline);
 }
 
@@ -255,15 +255,10 @@ void destroy_cmd_list (cmd_list *list)
     free (list);
 }
 
-/* TODO
- * 1. Проверки (input и output), один ли раз было перенаправление
- * этого типа.
- * 2. Подумать над редиректами до имени команды. */
 cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
 {
     cmd_pipeline_item *simple_cmd = make_cmd_pipeline_item ();
     word_buffer wbuf;
-    type_of_lex redirect_type; /* temporally */
     new_word_buffer (&wbuf);
 
 #ifdef PARSER_DEBUG
@@ -278,9 +273,27 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
             parser_get_lex (pinfo);
             break;
         case LEX_INPUT:
+            pinfo->error = (simple_cmd->input == NULL) ? 0 : 10; /* Error 10 */
+            if (pinfo->error)
+                continue;
+
+            parser_get_lex (pinfo);
+            /* Lexer error possible */
+            if (pinfo->error)
+                continue;
+            pinfo->error = (pinfo->cur_lex->type != LEX_WORD) ? 12 : 0; /* Error 12 */
+            if (pinfo->error)
+                continue;
+            simple_cmd->input = pinfo->cur_lex->str;
+            parser_get_lex (pinfo);
+            break;
         case LEX_OUTPUT:
         case LEX_APPEND:
-            redirect_type = pinfo->cur_lex->type;
+            pinfo->error = (simple_cmd->output == NULL) ? 0 : 11; /* Error 11 */
+            if (pinfo->error)
+                continue;
+
+            simple_cmd->append = (pinfo->cur_lex->type == LEX_OUTPUT) ? 0 : 1;
             parser_get_lex (pinfo);
             /* Lexer error possible */
             if (pinfo->error)
@@ -288,22 +301,7 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
             pinfo->error = (pinfo->cur_lex->type != LEX_WORD) ? 2 : 0; /* Error 2 */
             if (pinfo->error)
                 continue;
-            switch (redirect_type) {
-                case LEX_INPUT:
-                    simple_cmd->input = pinfo->cur_lex->str;
-                    break;
-                case LEX_OUTPUT:
-                    simple_cmd->output = pinfo->cur_lex->str;
-                    simple_cmd->append = 0;
-                    break;
-                case LEX_APPEND:
-                    simple_cmd->output = pinfo->cur_lex->str;
-                    simple_cmd->append = 1;
-                    break;
-                default:
-                    /* Not possible */
-                    break;
-            }
+            simple_cmd->output = pinfo->cur_lex->str;
             parser_get_lex (pinfo);
             break;
         default:
@@ -327,18 +325,13 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
     parser_print_error (pinfo, "parse_cmd_pipeline_item ()");
 #endif
     clear_word_buffer (&wbuf, 1);
+    /* freeing input/output strings in parse_cmd_pipeline () */
     free (simple_cmd);
     return NULL;
 }
 
 cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated);
 
-/* TODO: clear input/output pointers in cmd_pipeline_item
- * at parsing cmd_pipeline */
-/* TODO:
- * ловить некорректные редирректы
- * Корректные: на вход в первом simple cmd, на выход в последнем.
- */
 cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
 {
     cmd_pipeline *pipeline = make_cmd_pipeline ();
@@ -376,14 +369,29 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
         if (pipeline->first_item == NULL) {
             /* First simple cmd */
             pipeline->first_item = cur_item = tmp_item;
+            pipeline->input = cur_item->input;
+            cur_item->input = NULL;
         } else {
+            /* Second and following simple cmd */
             cur_item = cur_item->next = tmp_item;
+            pinfo->error = (cur_item->input == NULL) ? 0 : 8; /* Error 8 */
+            if (pinfo->error)
+                continue;
         }
 
         if (pinfo->cur_lex->type == LEX_PIPE) {
+            /* Not last simple cmd */
+            pinfo->error = (cur_item->output == NULL) ? 0 : 9; /* Error 9 */
+            if (pinfo->error)
+                continue;
             parser_get_lex (pinfo);
             continue;
         } else {
+            /* Last simple cmd in this pipeline */
+            pipeline->output = cur_item->output;
+            pipeline->append = cur_item->append;
+            cur_item->output = NULL;
+            cur_item->append = 0;
 #ifdef PARSER_DEBUG
             parser_print_action (pinfo, "parse_cmd_pipeline ()", 1);
 #endif
@@ -393,9 +401,13 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
 
     /* Error processing */
 #ifdef PARSER_DEBUG
-    parser_print_error (pinfo, "parsercmd_pipeline ()");
+    parser_print_error (pinfo, "parse_cmd_pipeline ()");
 #endif
     destroy_cmd_pipeline (pipeline);
+    if (cur_item != NULL && cur_item->input != NULL)
+        free (cur_item->input);
+    if (cur_item != NULL && cur_item->output != NULL)
+        free (cur_item->output);
     return NULL;
 }
 
