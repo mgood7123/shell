@@ -338,7 +338,10 @@ error:
     parser_print_error (pinfo, "parse_cmd_pipeline_item ()");
 #endif
     clear_word_buffer (&wbuf, 1);
-    /* freeing input/output strings in parse_cmd_pipeline () */
+    if (simple_cmd->input != NULL)
+        free (simple_cmd->input);
+    if (simple_cmd->output != NULL)
+        free (simple_cmd->output);
     free (simple_cmd);
     return NULL;
 }
@@ -369,8 +372,10 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
 
             tmp_item = make_cmd_pipeline_item ();
             tmp_item->cmd_lst = parse_cmd_list (pinfo, 1);
-            if (pinfo->error)
+            if (pinfo->error) {
+                free (tmp_item);
                 goto error;
+            }
 
             parser_get_lex (pinfo);
             break;
@@ -391,15 +396,23 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
             /* Second and following simple cmd */
             cur_item = cur_item->next = tmp_item;
             pinfo->error = (cur_item->input == NULL) ? 0 : 8; /* Error 8 */
-            if (pinfo->error)
+            if (pinfo->error) {
+                free (cur_item->input);
+                if (cur_item->output != NULL)
+                    free (cur_item->output);
                 goto error;
+            }
         }
 
         if (pinfo->cur_lex->type == LEX_PIPE) {
             /* Not last simple cmd */
             pinfo->error = (cur_item->output == NULL) ? 0 : 9; /* Error 9 */
-            if (pinfo->error)
+            if (pinfo->error) {
+                free (cur_item->output);
+                if (cur_item->input != NULL)
+                    free (cur_item->input);
                 goto error;
+            }
 
             parser_get_lex (pinfo);
             continue;
@@ -421,10 +434,6 @@ error:
     parser_print_error (pinfo, "parse_cmd_pipeline ()");
 #endif
     destroy_cmd_pipeline (pipeline);
-    if (cur_item != NULL && cur_item->input != NULL)
-        free (cur_item->input);
-    if (cur_item != NULL && cur_item->output != NULL)
-        free (cur_item->output);
     return NULL;
 }
 
