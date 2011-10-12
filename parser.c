@@ -85,7 +85,14 @@ void parser_get_lex (parser_info *pinfo)
 {
     if (pinfo->cur_lex != NULL)
         free (pinfo->cur_lex); /* do not freeing string */
+
     pinfo->cur_lex = get_lex (pinfo->linfo);
+
+#ifdef PARSER_DEBUG
+    fprintf (stderr, "Get lex: ");
+    print_lex (stderr, pinfo->cur_lex);
+#endif
+
     if (pinfo->cur_lex->type == LEX_ERROR) /* Error 1 */
         pinfo->error = 1;
     else
