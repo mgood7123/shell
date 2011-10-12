@@ -183,7 +183,7 @@ void print_relation (FILE *stream, type_of_relation rel) {
         fprintf (stream, " ; ");
         break;
     case REL_NONE:
-        /* No actions */
+        /* Do nothing */
         break;
     }
 }
@@ -265,7 +265,7 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
     parser_print_action (pinfo, "parse_cmd_pipeline_item ()", 0);
 #endif
 
-    while (!pinfo->error) {
+    do {
         switch (pinfo->cur_lex->type) {
         case LEX_WORD:
             /* Add to word buffer for making argv */
@@ -275,15 +275,17 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
         case LEX_INPUT:
             pinfo->error = (simple_cmd->input == NULL) ? 0 : 10; /* Error 10 */
             if (pinfo->error)
-                continue;
+                goto error;
 
             parser_get_lex (pinfo);
             /* Lexer error possible */
             if (pinfo->error)
-                continue;
+                goto error;
+
             pinfo->error = (pinfo->cur_lex->type != LEX_WORD) ? 12 : 0; /* Error 12 */
             if (pinfo->error)
-                continue;
+                goto error;
+
             simple_cmd->input = pinfo->cur_lex->str;
             parser_get_lex (pinfo);
             break;
@@ -291,26 +293,30 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
         case LEX_APPEND:
             pinfo->error = (simple_cmd->output == NULL) ? 0 : 11; /* Error 11 */
             if (pinfo->error)
-                continue;
+                goto error;
 
             simple_cmd->append = (pinfo->cur_lex->type == LEX_OUTPUT) ? 0 : 1;
             parser_get_lex (pinfo);
             /* Lexer error possible */
             if (pinfo->error)
-                continue;
+                goto error;
+
             pinfo->error = (pinfo->cur_lex->type != LEX_WORD) ? 2 : 0; /* Error 2 */
             if (pinfo->error)
-                continue;
+                goto error;
+
             simple_cmd->output = pinfo->cur_lex->str;
             parser_get_lex (pinfo);
             break;
         default:
             /* Lexer error possible */
             if (pinfo->error)
-                continue;
+                goto error;
+
             pinfo->error = (wbuf.count_words == 0) ? 3 : 0; /* Error 3 */
             if (pinfo->error)
-                continue;
+                goto error;
+
             /* make argv from word buffer */
             simple_cmd->argv = convert_to_argv (&wbuf, 1);
 #ifdef PARSER_DEBUG
@@ -318,9 +324,9 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
 #endif
             return simple_cmd;
         }
-    }
+    } while (!pinfo->error);
 
-    /* Error processing */
+error:
 #ifdef PARSER_DEBUG
     parser_print_error (pinfo, "parse_cmd_pipeline_item ()");
 #endif
@@ -341,7 +347,7 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
     parser_print_action (pinfo, "parse_cmd_pipeline ()", 0);
 #endif
 
-    while (!pinfo->error) {
+    do {
         switch (pinfo->cur_lex->type) {
         case LEX_WORD:
             tmp_item = parse_cmd_pipeline_item (pinfo);
@@ -352,11 +358,14 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
              * Нужно ли? */
             parser_get_lex (pinfo);
             if (pinfo->error)
-                continue;
+                goto error;
+
             tmp_item = make_cmd_pipeline_item ();
             tmp_item->cmd_lst = parse_cmd_list (pinfo, 1);
-            if (!pinfo->error)
-                parser_get_lex (pinfo);
+            if (pinfo->error)
+                goto error;
+
+            parser_get_lex (pinfo);
             break;
         default:
             pinfo->error = 4; /* Error 4 */
@@ -364,7 +373,7 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
         }
 
         if (pinfo->error)
-            continue;
+            goto error;
 
         if (pipeline->first_item == NULL) {
             /* First simple cmd */
@@ -376,14 +385,15 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
             cur_item = cur_item->next = tmp_item;
             pinfo->error = (cur_item->input == NULL) ? 0 : 8; /* Error 8 */
             if (pinfo->error)
-                continue;
+                goto error;
         }
 
         if (pinfo->cur_lex->type == LEX_PIPE) {
             /* Not last simple cmd */
             pinfo->error = (cur_item->output == NULL) ? 0 : 9; /* Error 9 */
             if (pinfo->error)
-                continue;
+                goto error;
+
             parser_get_lex (pinfo);
             continue;
         } else {
@@ -397,9 +407,9 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
 #endif
             return pipeline;
         }
-    }
+    } while (!pinfo->error);
 
-    /* Error processing */
+error:
 #ifdef PARSER_DEBUG
     parser_print_error (pinfo, "parse_cmd_pipeline ()");
 #endif
@@ -466,10 +476,10 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
     parser_print_action (pinfo, "parse_cmd_list ()", 0);
 #endif
 
-    while (!pinfo->error) {
+    do {
         tmp_item = parse_cmd_list_item (pinfo);
         if (pinfo->error)
-            continue;
+            goto error;
 
         if (list->first_item == NULL)
             list->first_item = cur_item = tmp_item;
@@ -480,25 +490,24 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
             list->foreground = 0;
             parser_get_lex (pinfo);
             if (pinfo->error)
-                continue;
+                goto error;
         }
 
         switch (pinfo->cur_lex->type) {
         case LEX_BRACKET_CLOSE:
             pinfo->error = (bracket_terminated) ? 0 : 5; /* Error 5 */
-            if (pinfo->error)
-                continue;
             break;
         case LEX_EOLINE:
         case LEX_EOFILE:
             pinfo->error = (bracket_terminated) ? 6 : 0; /* Error 6 */
-            if (pinfo->error)
-                continue;
             break;
         default:
-            /* No actions */
+            /* Do nothing */
             continue;
         }
+
+        if (pinfo->error)
+            goto error;
 
         switch (cur_item->rel) {
         case REL_NONE:
@@ -520,9 +529,9 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
         parser_print_action (pinfo, "parse_cmd_list ()", 1);
 #endif
         return list;
-    }
+    } while (!pinfo->error);
 
-    /* Error processing */
+error:
 #ifdef PARSER_DEBUG
     parser_print_error (pinfo, "parse_cmd_list ()");
 #endif
