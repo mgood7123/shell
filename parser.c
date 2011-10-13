@@ -485,6 +485,7 @@ error:
 
 cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
 {
+    int lex_term = 0;
     cmd_list *list = make_cmd_list (pinfo);
     cmd_list_item *cur_item = NULL, *tmp_item = NULL;
 
@@ -502,50 +503,57 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
         else
             cur_item = cur_item->next = tmp_item;
 
-        if (pinfo->cur_lex->type == LEX_BACKGROUND) {
-            list->foreground = 0;
-            parser_get_lex (pinfo);
-            if (pinfo->error)
-                goto error;
-        }
-
         switch (pinfo->cur_lex->type) {
+        case LEX_BACKGROUND:
         case LEX_BRACKET_CLOSE:
-            pinfo->error = (bracket_terminated) ? 0 : 5; /* Error 5 */
-            break;
         case LEX_EOLINE:
         case LEX_EOFILE:
-            pinfo->error = (bracket_terminated) ? 6 : 0; /* Error 6 */
+            lex_term = 1;
             break;
         default:
-            /* Do nothing */
-            continue;
-        }
-
-        if (pinfo->error)
-            goto error;
-
-        switch (cur_item->rel) {
-        case REL_NONE:
-            /* Do nothing */
-            break;
-        case REL_BOTH:
-            cur_item->rel = REL_NONE;
-            break;
-        case REL_OR:
-        case REL_AND:
-            pinfo->error = 7; /* Error 7 */
+            pinfo->error = (cur_item->rel == REL_NONE) ? 15 : 0; /* Error 15 */
             break;
         }
+    } while (!lex_term && !pinfo->error);
 
+    if (pinfo->error)
+        goto error;
+
+    if (pinfo->cur_lex->type == LEX_BACKGROUND) {
+        pinfo->error = (cur_item->rel == REL_NONE) ? 0 : 13; /* Error 13 */
         if (pinfo->error)
             goto error;
+        list->foreground = 0;
+        parser_get_lex (pinfo);
+    }
+
+    switch (pinfo->cur_lex->type) {
+    case LEX_BRACKET_CLOSE:
+        pinfo->error = (bracket_terminated) ? 0 : 5; /* Error 5 */
+        break;
+    case LEX_EOLINE:
+    case LEX_EOFILE:
+        pinfo->error = (bracket_terminated) ? 6 : 0; /* Error 6 */
+        break;
+    default:
+        pinfo->error = 14; /* Error 14 */
+        break;
+    }
+
+    if (pinfo->error)
+        goto error;
+
+    pinfo->error = ((cur_item->rel == REL_NONE)
+        || (cur_item->rel == REL_BOTH)) ? 0 : 7; /* Error 7 */
+    if (pinfo->error)
+        goto error;
+
+    cur_item->rel = REL_NONE;
 
 #ifdef PARSER_DEBUG
-        parser_print_action (pinfo, "parse_cmd_list ()", 1);
+    parser_print_action (pinfo, "parse_cmd_list ()", 1);
 #endif
-        return list;
-    } while (!pinfo->error);
+    return list;
 
 error:
 #ifdef PARSER_DEBUG
