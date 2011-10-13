@@ -45,6 +45,7 @@ typedef struct parser_info {
     lexer_info *linfo;
     lexeme *cur_lex;
     int error;
+    unsigned int save_str;
 } parser_info;
 
 #define PARSER_DEBUG
@@ -76,13 +77,19 @@ void init_parser (parser_info *pinfo)
     pinfo->linfo = (lexer_info *) malloc (sizeof (lexer_info));
     init_lexer (pinfo->linfo);
     pinfo->cur_lex = NULL;
+    pinfo->save_str = 0;
 }
 
 void parser_get_lex (parser_info *pinfo)
 {
-    if (pinfo->cur_lex != NULL)
-        free (pinfo->cur_lex); /* do not freeing string */
+    if (pinfo->cur_lex != NULL) {
+        if (pinfo->save_str)
+            free (pinfo->cur_lex);
+        else
+            destroy_lex (pinfo->cur_lex);
+    }
 
+    pinfo->save_str = 0;
     pinfo->cur_lex = get_lex (pinfo->linfo);
 
 #ifdef PARSER_DEBUG
@@ -274,6 +281,7 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
         case LEX_WORD:
             /* Add to word buffer for making argv */
             add_to_word_buffer (&wbuf, pinfo->cur_lex->str);
+            pinfo->save_str = 1;
             parser_get_lex (pinfo);
             break;
         case LEX_INPUT:
@@ -291,6 +299,7 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
                 goto error;
 
             simple_cmd->input = pinfo->cur_lex->str;
+            pinfo->save_str = 1;
             parser_get_lex (pinfo);
             break;
         case LEX_OUTPUT:
@@ -310,6 +319,7 @@ cmd_pipeline_item *parse_cmd_pipeline_item (parser_info *pinfo)
                 goto error;
 
             simple_cmd->output = pinfo->cur_lex->str;
+            pinfo->save_str = 1;
             parser_get_lex (pinfo);
             break;
         default:
