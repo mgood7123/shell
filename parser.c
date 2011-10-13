@@ -539,7 +539,7 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
         }
 
         if (pinfo->error)
-            continue;
+            goto error;
 
 #ifdef PARSER_DEBUG
         parser_print_action (pinfo, "parse_cmd_list ()", 1);
