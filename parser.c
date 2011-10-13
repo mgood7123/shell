@@ -524,6 +524,9 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
         parser_get_lex (pinfo);
     }
 
+    if (pinfo->error)
+        goto error;
+
     switch (pinfo->cur_lex->type) {
     case LEX_BRACKET_CLOSE:
         pinfo->error = (bracket_terminated) ? 0 : 5; /* Error 5 */
