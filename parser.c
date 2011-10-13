@@ -1,6 +1,7 @@
 #include "word_buffer.h"
 #include "lexer.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 typedef struct cmd_pipeline_item {
     /* Item data: */
@@ -49,9 +50,6 @@ typedef struct parser_info {
 #define PARSER_DEBUG
 
 #ifdef PARSER_DEBUG
-
-#include <stdio.h>
-
 void parser_print_action (parser_info *pinfo, const char *where, int leaving)
 {
     if (leaving)
@@ -60,7 +58,6 @@ void parser_print_action (parser_info *pinfo, const char *where, int leaving)
         fprintf (stderr, "Parser: entering to %s; ", where);
     print_lex (stderr, pinfo->cur_lex);
 }
-
 #endif
 
 void parser_print_error (parser_info *pinfo, const char *where)
@@ -571,8 +568,6 @@ gcc -g -Wall -ansi -pedantic parser.c buffer.o lexer.o word_buffer.o -o parser
  * Grep possible parsing errors:
 grep -Pn '\* Error \d+ \*' parser.c
 */
-
-#include <stdio.h>
 
 int main ()
 {
