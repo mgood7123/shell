@@ -1,54 +1,8 @@
+#include "parser.h"
+
 #include "word_buffer.h"
-#include "lexer.h"
 #include <stdlib.h>
 #include <stdio.h>
-
-typedef struct cmd_pipeline_item {
-    /* Item data: */
-    char **argv;
-    char *input;  /* temporally */
-    char *output; /* temporally */
-    unsigned int append:1; /* temporally */
-    struct cmd_list *cmd_lst;
-    /* End of item data */
-    struct cmd_pipeline_item *next;
-} cmd_pipeline_item;
-
-typedef struct cmd_pipeline {
-    char *input;
-    char *output;
-    unsigned int append:1;
-    struct cmd_pipeline_item *first_item;
-} cmd_pipeline;
-
-typedef enum type_of_relation {
-    REL_NONE,  /* no relation */
-    REL_OR,    /* '||' */
-    REL_AND,   /* '&&' */
-    REL_BOTH   /* ';'  */
-} type_of_relation;
-
-typedef struct cmd_list_item {
-    /* Item data: */
-    struct cmd_pipeline *pl;
-    type_of_relation rel;
-    /* End of item data */
-    struct cmd_list_item *next;
-} cmd_list_item;
-
-typedef struct cmd_list {
-    unsigned int foreground:1;
-    struct cmd_list_item *first_item;
-} cmd_list;
-
-typedef struct parser_info {
-    lexer_info *linfo;
-    lexeme *cur_lex;
-    int error;
-    unsigned int save_str;
-} parser_info;
-
-/* #define PARSER_DEBUG */
 
 #ifdef PARSER_DEBUG
 void parser_print_action (parser_info *pinfo, const char *where, int leaving)
@@ -613,8 +567,8 @@ int main ()
             fprintf (stderr, "Parser: empty command;\n");
             break;
         default:
-            / * TODO: flush read buffer,
-             * possibly via buffer function. * /
+            /* TODO: flush read buffer,
+             * possibly via buffer function. */
             fprintf (stderr, "Parser: bad command;\n");
             break;
         }
