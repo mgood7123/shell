@@ -3,8 +3,6 @@
 #include "buffer.h"
 #include <stdlib.h>
 
-/* #define LEXER_DEBUG */
-
 void print_state (const char *state_name, int c)
 {
     fprintf (stderr, "Lexer: %s; ", state_name);

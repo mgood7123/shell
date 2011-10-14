@@ -1,6 +1,8 @@
 #ifndef _LEXER_H
 #define _LEXER_H
 
+/* #define LEXER_DEBUG */
+
 typedef enum type_of_lex {
     LEX_INPUT,         /* '<'  */
     LEX_OUTPUT,        /* '>'  */
