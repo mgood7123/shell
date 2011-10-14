@@ -48,7 +48,7 @@ typedef struct parser_info {
     unsigned int save_str;
 } parser_info;
 
-#define PARSER_DEBUG
+/* #define PARSER_DEBUG */
 
 #ifdef PARSER_DEBUG
 void parser_print_action (parser_info *pinfo, const char *where, int leaving)
@@ -353,7 +353,7 @@ error:
     return NULL;
 }
 
-cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated);
+cmd_list *parse_cmd_list (parser_info *pinfo);
 
 cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
 {
@@ -370,15 +370,8 @@ cmd_pipeline *parse_cmd_pipeline (parser_info *pinfo)
             tmp_item = parse_cmd_pipeline_item (pinfo);
             break;
         case LEX_BRACKET_OPEN:
-            /* TODO: переместить считывание
-             * открывающей скобки в parse_cmd_list.
-             * Нужно ли? */
-            parser_get_lex (pinfo);
-            if (pinfo->error)
-                goto error;
-
             tmp_item = make_cmd_pipeline_item ();
-            tmp_item->cmd_lst = parse_cmd_list (pinfo, 1);
+            tmp_item->cmd_lst = parse_cmd_list (pinfo);
             if (pinfo->error) {
                 free (tmp_item);
                 goto error;
@@ -490,8 +483,9 @@ error:
     return NULL;
 }
 
-cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
+cmd_list *parse_cmd_list (parser_info *pinfo)
 {
+    int bracket_terminated = 0;
     int lex_term = 0;
     cmd_list *list = make_cmd_list (pinfo);
     cmd_list_item *cur_item = NULL, *tmp_item = NULL;
@@ -499,6 +493,24 @@ cmd_list *parse_cmd_list (parser_info *pinfo, int bracket_terminated)
 #ifdef PARSER_DEBUG
     parser_print_action (pinfo, "parse_cmd_list ()", 0);
 #endif
+
+    if (pinfo->cur_lex != NULL)
+        bracket_terminated = (pinfo->cur_lex->type == LEX_BRACKET_OPEN);
+
+    parser_get_lex (pinfo);
+    if (pinfo->error)
+        goto error;
+
+    switch (pinfo->cur_lex->type) {
+    case LEX_EOLINE:
+    case LEX_EOFILE:
+        /* Empty cmd list */
+        pinfo->error = 16; /* Error 16 */
+        goto error;
+    default:
+        /* Do nothing */
+        break;
+    }
 
     do {
         tmp_item = parse_cmd_list_item (pinfo);
@@ -589,17 +601,22 @@ int main ()
     init_parser (&pinfo);
 
     do {
-        parser_get_lex (&pinfo);
-        list = parse_cmd_list (&pinfo, 0);
+        list = parse_cmd_list (&pinfo);
 
-        if (pinfo.error) {
-            /* TODO: flush read buffer,
-             * possibly via buffer function. */
-            fprintf (stderr, "Parser: error;\n");
-        } else {
+        switch (pinfo.error) {
+        case 0:
             print_cmd_list (stdout, list, 1);
             destroy_cmd_list (list);
             list = NULL;
+            break;
+        case 16:
+            fprintf (stderr, "Parser: empty command;\n");
+            break;
+        default:
+            / * TODO: flush read buffer,
+             * possibly via buffer function. * /
+            fprintf (stderr, "Parser: bad command;\n");
+            break;
         }
 
         if (pinfo.cur_lex->type == LEX_EOFILE)
