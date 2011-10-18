@@ -53,8 +53,8 @@ char *convert_to_string (buffer *buf, int destroy_me)
 {
     strblock *current = buf->first_block;
     strblock *next;
-    char *str = (char *) malloc 
-        (sizeof (char) * (buf->count_sym + 1));
+    char *str = (char *) malloc (sizeof (char)
+        * (buf->count_sym + 1));
     char *cur_sym_to = str;
     int cur_size;
 

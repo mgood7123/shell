@@ -11,14 +11,22 @@ void parser_print_action (parser_info *pinfo, const char *where, int leaving)
         fprintf (stderr, "Parser: leaving from %s; ", where);
     else
         fprintf (stderr, "Parser: entering to %s; ", where);
-    print_lex (stderr, pinfo->cur_lex);
+
+    if (pinfo->cur_lex != NULL)
+        print_lex (stderr, pinfo->cur_lex);
+    else
+        fprintf (stderr, "\n");
 }
 #endif
 
 void parser_print_error (parser_info *pinfo, const char *where)
 {
     fprintf (stderr, "Parser: error #%d in %s; ", pinfo->error, where);
-    print_lex (stderr, pinfo->cur_lex);
+
+    if (pinfo->cur_lex != NULL)
+        print_lex (stderr, pinfo->cur_lex);
+    else
+        fprintf (stderr, "\n");
 }
 
 void parser_get_lex (parser_info *pinfo);
@@ -548,6 +556,7 @@ gcc -g -Wall -ansi -pedantic parser.c buffer.o lexer.o word_buffer.o -o parser
 grep -Pn '\* Error \d+ \*' parser.c
 */
 
+/*
 int main ()
 {
     cmd_list *list;
@@ -567,8 +576,8 @@ int main ()
             fprintf (stderr, "Parser: empty command;\n");
             break;
         default:
-            /* TODO: flush read buffer,
-             * possibly via buffer function. */
+            / * TODO: flush read buffer,
+             * possibly via buffer function. * /
             fprintf (stderr, "Parser: bad command;\n");
             break;
         }
@@ -579,3 +588,4 @@ int main ()
 
     return 0;
 }
+*/

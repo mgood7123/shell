@@ -3,168 +3,237 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
 
-#define TERM_DESC STDIN_FILENO
+/* TODO stdin for "read" (by permissions) operations and stdout for "write" */
 
-int cd_to_path(char *str)
+/* Returns:
+ * 0, if success.
+ * 1, otherwise. */
+int exec_cd (char *str)
 {
-	int status = chdir(str);
+    int status;
 
-	if (status) {
-		perror((char *) NULL);
-	} else {
-		char *oldpwd = getenv("PWD");
-		char *pwd = getcwd(NULL, 0);
-		setenv("OLDPWD", oldpwd, 1);
-		setenv("PWD", pwd, 1);
-		free(pwd);
-	}
+    if (str == NULL) {
+        fprintf (stderr, "cd to NULL? No!\n");
+        return 1;
+    }
 
-	return status;
+    status = chdir (str);
+
+    if (status == 0) {
+        /* Change variables */
+        char *oldpwd = getenv ("PWD");
+        char *pwd = getcwd (NULL, 0);
+        setenv ("OLDPWD", oldpwd, 1);
+        setenv ("PWD", pwd, 1);
+        free (pwd);
+    } else {
+        perror ("cd");
+    }
+
+    return status;
 }
 
-char *cd_to_var(char *varname)
+#define STR_EQUAL(str1, str2) (strcmp ((str1), (str2)) == 0)
+
+int run_cd (process *p)
 {
-	char *var = getenv(varname);
+    char *new_dir;
+    char *arg1 = *(p->argv + 1);
+    int status;
 
-	if (!var) {
-		printf("Variable %s is unset!\n", varname);
-		return NULL;
-	}
+    if (arg1 == NULL) {
+        new_dir = getenv ("HOME");
+    } else if (STR_EQUAL (arg1, "-")) {
+        new_dir = getenv ("OLDPWD");
+    } else {
+        new_dir = arg1;
+    }
 
-	if (cd_to_path(var))
-		return NULL;
-	return var;
+    status = exec_cd (new_dir);
+    new_dir = getenv ("PWD"); /* full path */
+
+    if (status == 0) {
+        printf ("%s\n", new_dir);
+    } else {
+        fprintf (stderr, "cd failed.\n");
+    }
+
+    return status;
 }
 
-int run_cd(pipeline *scmd)
+/* Returns:
+ * fd if all right
+ * 0 if file == NULL
+ * -1 if error */
+int get_input_fd (cmd_pipeline *pipeline)
 {
-	char *arg2 = *(scmd->argv+1);
-	if (arg2) {
-		if (strcmp(arg2, "-"))
-			return cd_to_path(arg2) == 0;
-		else
-			return cd_to_var("OLDPWD") != NULL;
-	} else {
-		char *pwd = cd_to_var("HOME");
-		if (pwd != NULL)
-			printf("%s\n", pwd);
-		return pwd != NULL;
-	}
+    int flags, fd;
+
+    if (pipeline->input == NULL)
+        return 0; /* file == NULL */
+
+    flags = O_RDONLY;
+    fd = open (pipeline->input, flags);
+
+    if (fd < 0) {
+        perror("open ()");
+        return -1; /* Error */
+    }
+
+    free (pipeline->input);
+    pipeline->input = NULL;
+
+    return fd; /* All rigtht */
 }
 
-int change_redirection(pipeline *scmd, int input)
+/* Returns:
+ * fd if all right
+ * 0 if file == NULL
+ * -1 if error */
+int get_output_fd (cmd_pipeline *pipeline)
 {
-	int flags, fd;
-	int fd_origin_num = input ? STDIN_FILENO : STDOUT_FILENO;
-	char *file = input ? scmd->input : scmd->output;
+    int flags, fd;
 
-	/* need redirection? */
-	if (file == NULL)
-		return 0;
+    if (pipeline->output == NULL)
+        return 0; /* file == NULL */
 
-	/* change flags */
-	if (input)
-		flags = O_RDONLY;
-	else if (scmd->append)
-		flags = O_CREAT | O_WRONLY | O_APPEND;
-	else
-		flags = O_CREAT | O_WRONLY | O_TRUNC;
+    if (pipeline->append)
+        flags = O_CREAT | O_WRONLY | O_APPEND;
+    else
+        flags = O_CREAT | O_WRONLY | O_TRUNC;
 
-	/* open file */
-	if (input)
-		fd = open(file, flags);
-	else
-		fd = open(file, flags,
-			S_IRUSR | S_IWUSR |
-			S_IRGRP | S_IWGRP |
-			S_IROTH | S_IWOTH);
-	if (fd < 0) {
-		perror("open()");
-		return NOT_RUNNED;
-	}
+    fd = open (pipeline->output, flags,
+        S_IRUSR | S_IWUSR |
+        S_IRGRP | S_IWGRP |
+        S_IROTH | S_IWOTH);
 
-	 /* save copy */ /* not need if in clild process
-	if_true_return((*fd_origin = dup(fd_origin_num)) < 0);
-	*/
+    if (fd < 0) {
+        perror("open ()");
+        return -1;
+    }
 
-	/* duplicate a file descriptor */
-	dup2_or_return(fd, fd_origin_num);
-	/* close file descriptor */
-	close_or_return(fd);
+    free (pipeline->output);
+    pipeline->output = NULL;
 
-	return 0;
+    return fd;
 }
 
-int unchange_redirection(int fd, int input)
+/* TODO */
+void wait_for_job ()
 {
-	int fd_origin_num = input ? STDIN_FILENO : STDOUT_FILENO;
+    wait4 (-1, NULL, WUNTRACED, NULL);
+}
 
-	/* need unchange? */
-	if (fd < 0)
-		return 0;
+void change_redirections (shell_info *sinfo, process *p)
+{
+    if (p->infile != STDIN_FILENO) {
+        sinfo->orig_stdin = dup (STDIN_FILENO);
+        dup2 (p->infile, STDIN_FILENO);
+        close (p->infile);
+    }
 
-	close_or_return(fd_origin_num);
-	dup2_or_return(fd, fd_origin_num);
-	close_or_return(fd);
+    if (p->outfile != STDOUT_FILENO) {
+        sinfo->orig_stdout = dup (STDOUT_FILENO);
+        dup2 (p->outfile, STDOUT_FILENO);
+        close (p->outfile);
+    }
+}
 
-	return 0;
+void unchange_redirections (shell_info *sinfo, process *p)
+{
+    if (p->infile != STDIN_FILENO) {
+        dup2 (sinfo->orig_stdin, STDIN_FILENO);
+        close (sinfo->orig_stdin);
+        sinfo->orig_stdin = STDIN_FILENO;
+    }
+
+    if (p->outfile != STDOUT_FILENO) {
+        dup2 (sinfo->orig_stdout, STDOUT_FILENO);
+        close (sinfo->orig_stdout);
+        sinfo->orig_stdout = STDOUT_FILENO;
+    }
+}
+
+int run_internal_cmd (process *p)
+{
+    int runned = 0;
+
+    if (STR_EQUAL (*(p->argv), "cd")) {
+        p->status = run_cd (p);
+        runned = 1;
+    }
+
+    return runned;
 }
 
 /* set process group ID
  * set controlling terminal options
  * set job control signals to SIG_DFL
- * exec */
-void launch_process(process *p, pid_t pgid, int foreground)
+ * exec => no return */
+void launch_process (shell_info *sinfo, process *p, pid_t pgid, int foreground)
 {
-    if (shell_interactive) {
+    if (sinfo->shell_interactive) {
         /* set process group ID
-         * (0 mean calling process ID) */
-        /* we must make it before tcsetpgrp */
-        if (setpgid(0, pgid)) {
-            perror("(In child process) setpgid");
+         * we must make it before tcsetpgrp */
+        if (setpgid (p->pid, pgid)) {
+            perror ("(In child process) setpgid");
+            exit (1);
         }
 
         /* we must make in before execvp */
-        if (foreground && tcsetpgrp(TERM_DESC, pgid)) {
-            perror("(In child process) tcsetpgrp");
+        if (foreground && tcsetpgrp (sinfo->orig_stdin, pgid)) {
+            perror ("(In child process) tcsetpgrp ()");
+            exit (1);
         }
 
-        set_sig_dfl();
+        set_sig_dfl ();
     }
-    /* TODO: dup2 && close for redirections */
-    execvp(*(p->argv), p->argv);
-    perror("(In child process) execvp");
-    exit(1);
+
+    execvp (*(p->argv), p->argv);
+    perror ("(In child process) execvp");
+    exit (1);
 }
 
-void launch_job(job *j, int foreground)
+#define FORK_ERROR(fork_value) ((fork_value) < 0)
+#define FORK_IS_CHILD(fork_value) ((fork_value) == 0)
+#define FORK_IS_PARENT(fork_value) ((fork_value) > 0)
+
+void launch_job (shell_info *sinfo, job *j, int foreground)
 {
     process *p;
     pid_t fork_value;
 
-    for (p = j->first_process; p; p = p->next) {
-        /* TODO: resolve pipes and redirections */
-        fork_value = fork();
+    for (p = j->first_process; p != NULL; p = p->next) {
+        if (p == j->first_process)
+            p->infile = j->stdin;
+        if (p->next == NULL)
+            p->outfile = j->stdout;
 
-        if (fork_value < 0) {
-            perror("fork");
-            exit(1); // return?
+        change_redirections (sinfo, p);
+
+        if (run_internal_cmd (p)) {
+            unchange_redirections (sinfo, p);
+            continue;
+        }
+
+        fork_value = fork ();
+
+        if (FORK_ERROR (fork_value)) {
+            perror ("fork");
+            exit (1); /* return? */
         }
 
         /* set p->pid ang pgid for both processes */
-        if (shell_interactive) {
-            if (fork_value) {
-                /* shell process */
+        if (sinfo->shell_interactive) {
+            if (FORK_IS_PARENT (fork_value)) {
                 p->pid = fork_value;
             } else {
-                /* child process */
-                p->pid = getpid();
+                p->pid = getpid ();
             }
 
             if (p == j->first_process) {
@@ -172,44 +241,133 @@ void launch_job(job *j, int foreground)
             }
         }
 
-        if (fork_value == 0) {
-            /* child process */
-            launch_process(p, j->pgid, foreground);
+        if (FORK_IS_CHILD (fork_value)) {
+            /* TODO: resolve pipes */
+            launch_process (sinfo, p, j->pgid, foreground); /* No return */
         }
 
-        /* parent process */
-
-        if (shell_interactive) {
+        /* parent process (here and next) */
+        if (sinfo->shell_interactive) {
             /* set process group ID
              * we must make it before tcsetpgrp
              * for job (after this for) */
-            if (setpgid(p->pid, j->pgid)) {
-                perror("(In child process) setpgid");
-            }
+            if (setpgid (p->pid, j->pgid))
+                perror ("(In child process) setpgid");
         }
 
-        /* TODO: unset redirections */
+        unchange_redirections (sinfo, p);
     } /* for */
 
-    if (shell_interactive) {
+    if (sinfo->shell_interactive) {
         if (foreground) {
-            tcsetpgrp(p->pid, j->pgid);
-            wait_for_job(j);
-            /* come back terminal permission
-            (0 mean calling process group ID) */
-            tcsetpgrp(TERM_DESC, 0);
             /* TODO: setattr */
+            wait_for_job (j);
         }
         /* if background do nothing */
     } else {
         /* not interactive */
-        wait_for_job(j);
+        wait_for_job (j);
     }
+
+    /* come back terminal permission */
+    /* TODO: if foreground? */
+    tcsetpgrp (STDIN_FILENO, sinfo->shell_pgid);
 }
 
-int run_command(command *cmd)
+process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
 {
-	if (!cmd->list)
-		return NOT_RUNNED;
-	return run_pipeline(cmd->list->pl, cmd->background);
+    process *p;
+    if (simple_cmd == NULL)
+        return NULL;
+    p = (process *) malloc (sizeof (process));
+    p->argv = simple_cmd->argv;
+    free (simple_cmd);
+    p->pid = 0; /* Not runned */
+    p->completed = 0;
+    p->stopped = 0;
+    p->status = 0;
+    p->infile = STDIN_FILENO;
+    p->outfile = STDOUT_FILENO;
+    p->next = NULL;
+    return p;
+}
+
+job *pipeline_to_job (cmd_pipeline *pipeline)
+{
+    job *j = (job *) malloc (sizeof (job));
+    process *current_item = NULL;
+    cmd_pipeline_item *current_simple_cmd = pipeline->first_item;
+    int tmp_fd;
+
+    j->first_process = NULL;
+    j->pgid = 0; /* Not runned */
+    j->notified = 0;
+    j->stdin = STDIN_FILENO;
+    j->stdout = STDOUT_FILENO;
+    /* j->stderr = STDERR_FILENO; */
+    j->next = NULL;
+
+    while (current_simple_cmd != NULL) {
+        if (current_item == NULL) {
+            j->first_process = current_item =
+                pipeline_item_to_process (current_simple_cmd);
+        } else {
+            fprintf (stderr, "Runner: currently pipelines not implemented.\n");
+            return NULL;
+            /*
+            current_item = current_item->next =
+                pipeline_item_to_process (current_simple_cmd);
+            */
+        }
+        current_simple_cmd = current_simple_cmd->next;
+    }
+
+    /* TODO: maybe, make redirections in child process? */
+    tmp_fd = get_input_fd (pipeline);
+    if (tmp_fd < 0) {
+        /* TODO: goto error, free () */
+        return NULL;
+    } else if (tmp_fd > 0) {
+        j->stdin = tmp_fd;
+    } else {
+        j->stdin = STDIN_FILENO;
+    }
+
+    tmp_fd = get_output_fd (pipeline);
+    if (tmp_fd < 0) {
+        /* TODO: goto error, free () */
+        return NULL;
+    } else if (tmp_fd > 0) {
+        j->stdout = tmp_fd;
+    } else {
+        j->stdout = STDOUT_FILENO;
+    }
+
+    /* Items already freed in loop */
+    /* Strings for input/output files already freed in get_*_fd () */
+    free (pipeline);
+
+    return j;
+}
+
+/* TODO */
+void run_cmd_list (shell_info *sinfo, cmd_list *list)
+{
+    job *j;
+
+    if (!list->foreground) {
+        fprintf (stderr, "Runner: currently background jobs not implemented.\n");
+        return;
+    }
+
+    if (list->first_item->rel != REL_NONE) {
+        fprintf (stderr, "Runner: currently command lists not implemented.\n");
+        return;
+    }
+
+    j = pipeline_to_job (list->first_item->pl);
+    if (j == NULL)
+        return;
+
+    launch_job (sinfo, j, list->foreground);
 }

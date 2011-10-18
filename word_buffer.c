@@ -46,8 +46,8 @@ char **convert_to_argv (word_buffer *wbuf, int destroy_me)
 {
     word_item *current = wbuf->first_item;
     word_item *next;
-    char **argv = (char **) malloc 
-        (sizeof (char *) * (wbuf->count_words + 1));
+    char **argv = (char **) malloc (sizeof (char *)
+        * (wbuf->count_words + 1));
     char **cur_str = argv;
 
     while (current != NULL) {

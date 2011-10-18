@@ -1,20 +1,11 @@
-#include "types.h"
-#include "lexer.h"
-/* #include "runner.h" */
+#include "common.h"
+#include "parser.h"
+#include "runner.h"
 
-/* for setenv () */
-#define _POSIX_C_SOURCE 200112L
-
-#include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/stat.h>
 #include <string.h>
-#include <signal.h>
-
-/*
-char **global_envp;
-pid_t shell_pgid;
+#include <stdlib.h>
 
 void set_sig_ign (void)
 {
@@ -26,7 +17,7 @@ void set_sig_ign (void)
     signal (SIGCHLD, SIG_IGN);
 }
 
-void set_sig_dfl(void)
+void set_sig_dfl (void)
 {
     signal (SIGINT, SIG_DFL);
     signal (SIGQUIT, SIG_DFL);
@@ -35,7 +26,6 @@ void set_sig_dfl(void)
     signal (SIGTTOU, SIG_DFL);
     signal (SIGCHLD, SIG_DFL);
 }
-*/
 
 /* Shell initialization:
  * save envp;
@@ -47,30 +37,31 @@ void set_sig_dfl(void)
 
 /* Note: this is not check for
  * interactively/background runned shell. */
-/*
-void init_shell (char **envp)
+void init_shell (shell_info *sinfo, char **envp)
 {
-    char *pwd;
-
-    global_envp = envp;
-
-    pwd = getcwd (NULL, 0);
-    setenv ("PWD", pwd, 1);
-    free (pwd);
-
+    char *cur_dir = getcwd (NULL, 0);
+    if (cur_dir != NULL) {
+        setenv ("PWD", cur_dir, 1);
+        free (cur_dir);
+    }
     umask (S_IWGRP | S_IWOTH);
-
     set_sig_ign ();
 
-    shell_pgid = getpid ();
-    tcsetpgrp (STDIN_FILENO, shell_pgid);
+    /* sinfo = (shell_info *) malloc (sizeof (shell_info)); */
+    sinfo->envp = envp;
+    sinfo->shell_pgid = getpid ();
+    sinfo->orig_stdin = STDIN_FILENO;
+    sinfo->orig_stdout = STDOUT_FILENO;
+
+    sinfo->shell_interactive = isatty (sinfo->orig_stdin);
+    tcsetpgrp (sinfo->orig_stdin, sinfo->shell_pgid);
 }
 
 void print_prompt1 (void)
 {
-    char *ps1 = getenv("PS1");
-    char *user = getenv("USER");
-    char *pwd = getenv("PWD");
+    char *ps1 = getenv ("PS1");
+    char *user = getenv ("USER");
+    char *pwd = getenv ("PWD");
 
     if (ps1) {
         printf ("%s", ps1);
@@ -108,42 +99,51 @@ void print_prompt2 (void)
     printf ("%s ", ">");
 }
 
-void print_set ()
+/*
+void print_set (char **envp)
 {
-    char **envp = global_envp;
-    if (!envp)
+    if (envp == NULL)
         return;
 
-    while (*envp)
+    while (*envp != NULL)
         printf ("%s\n", *(envp++));
 }
 */
 
 int main (int argc, char **argv, char **envp)
 {
-    lexer_info lexer_info;
-    init_lexer (&lexer_info);
-/*    signal(SIGINT, SIG_IGN);  TODO: not ignore, continue main do..while */
+    shell_info sinfo;
+    cmd_list *list;
+    parser_info pinfo;
 
-/*    init_shell(envp);*/
+    init_shell (&sinfo, envp);
+    init_parser (&pinfo);
 
     do {
-        lexeme *lex = get_lex (&lexer_info);
-        print_lex (lex);
-        if (lex->type == LEX_EOFILE)
-            return 0;
-        destroy_lex (lex);
+        print_prompt1 ();
+        list = parse_cmd_list (&pinfo);
 
-        if (lexer_info.state == ST_ERROR) {
-            fprintf(stderr, "(>_<)\n");
-            continue;
+        switch (pinfo.error) {
+        case 0:
+            run_cmd_list (&sinfo, list);
+            /*
+            print_cmd_list (stdout, list, 1);
+            destroy_cmd_list (list);
+            */
+            list = NULL;
+            break;
+        case 16:
+            fprintf (stderr, "Parser: empty command;\n");
+            break;
+        default:
+            /* TODO: flush read buffer,
+             * possibly via buffer function. */
+            fprintf (stderr, "Parser: bad command;\n");
+            break;
         }
 
-/*        signal(SIGINT, SIG_DFL);  TODO: kill fg process */
-/*        run_command(cmd); */
-/*        signal(SIGINT, SIG_IGN);*/
-
-/*        dispose_command(cmd); */
+        if (pinfo.cur_lex->type == LEX_EOFILE)
+            exit (pinfo.error);
     } while (1);
 
     return 0;

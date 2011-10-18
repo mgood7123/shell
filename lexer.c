@@ -1,6 +1,7 @@
 #include "lexer.h"
 
 #include "buffer.h"
+#include "common.h"
 #include <stdlib.h>
 
 void print_state (const char *state_name, int c)
@@ -242,6 +243,7 @@ lexeme *get_lex (lexer_info *linfo)
                 continue;
             case '\n':
                 /* Ignore newline symbol */
+                print_prompt2 ();
                 break;
 /* Non bash-like behaviour. In bash substitution
  * makes in $'string' costruction. */
@@ -286,6 +288,9 @@ lexeme *get_lex (lexer_info *linfo)
             case '\"':
                 add_to_buffer (&buf, linfo->c);
                 break;
+            case '\n':
+                print_prompt2 ();
+                /* fallthrough */
             default:
                 add_to_buffer (&buf, '\\');
                 add_to_buffer (&buf, linfo->c);
@@ -312,6 +317,9 @@ lexeme *get_lex (lexer_info *linfo)
                 deferred_get_char (linfo);
                 linfo->state = ST_WORD;
                 break;
+            case '\n':
+                print_prompt2 ();
+                /* fallthrough */
             default:
                 add_to_buffer (&buf, linfo->c);
                 deferred_get_char (linfo);
