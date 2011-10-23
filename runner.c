@@ -123,10 +123,90 @@ int get_output_fd (cmd_pipeline *pipeline)
     return fd;
 }
 
-/* TODO */
-void wait_for_job ()
+/* Returns:
+ * 1, if all processes in job stopped;
+ * 0, otherwise. */
+int job_is_stopped (job *j)
 {
-    wait4 (-1, NULL, WUNTRACED, NULL);
+    process *p = j->first_process;
+
+    while (p != NULL) {
+        if (!p->stopped)
+            return 0;
+        p = p->next;
+    }
+
+    return 1;
+}
+
+/* Returns:
+ * 1, if all processes in job completed;
+ * 0, otherwise. */
+int job_is_completed (job *j)
+{
+    process *p = j->first_process;
+
+    while (p != NULL) {
+        if (!p->completed)
+            return 0;
+        p = p->next;
+    }
+
+    return 1;
+}
+
+/* Returns:
+ * 1, if updated;
+ * 0, otherwise. */
+int update_status (job *j, pid_t pid, int status)
+{
+    process *p = j->first_process;
+
+    if (pid <= 0)
+        return 0;
+
+    while (p != NULL) {
+        if (p->pid == pid) {
+            p->status = status;
+            p->stopped = WIFSTOPPED (p->status) ? 1 : 0;
+            p->completed = !p->stopped;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+/* tmp? */
+void wait_for_one_process (pid_t pid, int foreground)
+{
+    if (foreground) {
+        wait4 (pid, NULL, WUNTRACED, NULL);
+    }
+
+    do {
+        pid = wait4 (WAIT_ANY, NULL, WNOHANG | WUNTRACED, NULL);
+    } while (pid > 0);
+
+}
+
+/* TODO */
+void wait_for_job (job *j, int foreground)
+{
+    int status;
+    pid_t pid;
+
+    do {
+        pid = wait4 (WAIT_ANY, &status, WUNTRACED, NULL);
+    } while (!update_status (j, pid, status)
+            && !job_is_stopped (j)
+            && !job_is_completed (j));
+
+    /*
+    search_by_pid (pid, j, p);
+    pid = wait4 (WAIT_ANY, &(p->status), WUNTRACED, NULL);
+    update_job (j, p);
+    */
 }
 
 void change_redirections (shell_info *sinfo, process *p)
@@ -175,7 +255,8 @@ int run_internal_cmd (process *p)
  * set controlling terminal options
  * set job control signals to SIG_DFL
  * exec => no return */
-void launch_process (shell_info *sinfo, process *p, pid_t pgid, int foreground)
+void launch_process (shell_info *sinfo, process *p,
+        pid_t pgid, int foreground)
 {
     if (sinfo->shell_interactive) {
         /* set process group ID
@@ -261,12 +342,14 @@ void launch_job (shell_info *sinfo, job *j, int foreground)
     if (sinfo->shell_interactive) {
         if (foreground) {
             /* TODO: setattr */
-            wait_for_job (j);
+            /*wait_for_job (j, foreground);*/
+            wait_for_one_process (j->pgid, foreground);
         }
         /* if background do nothing */
     } else {
         /* not interactive */
-        wait_for_job (j);
+        /*wait_for_job (j, foreground);*/
+        wait_for_one_process (j->pgid, foreground);
     }
 
     /* come back terminal permission */
@@ -353,21 +436,28 @@ job *pipeline_to_job (cmd_pipeline *pipeline)
 /* TODO */
 void run_cmd_list (shell_info *sinfo, cmd_list *list)
 {
+    cmd_list_item *cur_item = list->first_item;
     job *j;
-
-    if (!list->foreground) {
-        fprintf (stderr, "Runner: currently background jobs not implemented.\n");
-        return;
-    }
 
     if (list->first_item->rel != REL_NONE) {
         fprintf (stderr, "Runner: currently command lists not implemented.\n");
         return;
     }
 
-    j = pipeline_to_job (list->first_item->pl);
-    if (j == NULL)
-        return;
+    do {
+        j = pipeline_to_job (cur_item->pl);
+        if (j == NULL)
+            return;
 
-    launch_job (sinfo, j, list->foreground);
+        launch_job (sinfo, j, list->foreground);
+
+        /*
+        if ((cur_item->rel == REL_NONE)
+            || (cur_item->rel == REL_OR && j->status != 0)
+            || (cur_item->rel == REL_AND && j->status == 0))
+            break;
+        */
+
+        cur_item = cur_item->next;
+    } while (cur_item != NULL); /* to be on the safe side */
 }
