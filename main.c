@@ -14,7 +14,9 @@ void set_sig_ign (void)
     signal (SIGTSTP, SIG_IGN);
     signal (SIGTTIN, SIG_IGN);
     signal (SIGTTOU, SIG_IGN);
-    signal (SIGCHLD, SIG_IGN);
+    /* Do not ignore SIGCHLD! If SIGCHLD set to SIG_IGN,
+     * waitpid/wait4 behaviour changed, see `man waitpid`.
+     * It noted in POSIX.1-2001. */
 }
 
 void set_sig_dfl (void)
@@ -24,7 +26,6 @@ void set_sig_dfl (void)
     signal (SIGTSTP, SIG_DFL);
     signal (SIGTTIN, SIG_DFL);
     signal (SIGTTOU, SIG_DFL);
-    signal (SIGCHLD, SIG_DFL);
 }
 
 /* Shell initialization:
@@ -52,6 +53,8 @@ void init_shell (shell_info *sinfo, char **envp)
     sinfo->shell_pgid = getpid ();
     sinfo->orig_stdin = STDIN_FILENO;
     sinfo->orig_stdout = STDOUT_FILENO;
+    sinfo->first_job = NULL;
+    sinfo->last_job = NULL;
 
     sinfo->shell_interactive = isatty (sinfo->orig_stdin);
     tcsetpgrp (sinfo->orig_stdin, sinfo->shell_pgid);
@@ -133,7 +136,11 @@ int main (int argc, char **argv, char **envp)
             list = NULL;
             break;
         case 16:
+#ifdef PARSER_DEBUG
             fprintf (stderr, "Parser: empty command;\n");
+#endif
+            /* Empty command is not error */
+            pinfo.error = 0;
             break;
         default:
             /* TODO: flush read buffer,

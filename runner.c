@@ -66,16 +66,18 @@ int run_cd (process *p)
     return status;
 }
 
-/* Returns:
+#define GET_FD_ERROR(get_fd_value) ((get_fd_value) == -1)
+
+/* Open file, free pipeline->input.
+ * Returns:
  * fd if all right
- * 0 if file == NULL
  * -1 if error */
 int get_input_fd (cmd_pipeline *pipeline)
 {
     int flags, fd;
 
     if (pipeline->input == NULL)
-        return 0; /* file == NULL */
+        return STDIN_FILENO;
 
     flags = O_RDONLY;
     fd = open (pipeline->input, flags);
@@ -88,19 +90,19 @@ int get_input_fd (cmd_pipeline *pipeline)
     free (pipeline->input);
     pipeline->input = NULL;
 
-    return fd; /* All rigtht */
+    return fd;
 }
 
-/* Returns:
+/* Open file, free pipeline->output.
+ * Returns:
  * fd if all right
- * 0 if file == NULL
  * -1 if error */
 int get_output_fd (cmd_pipeline *pipeline)
 {
     int flags, fd;
 
     if (pipeline->output == NULL)
-        return 0; /* file == NULL */
+        return STDOUT_FILENO;
 
     if (pipeline->append)
         flags = O_CREAT | O_WRONLY | O_APPEND;
@@ -114,7 +116,7 @@ int get_output_fd (cmd_pipeline *pipeline)
 
     if (fd < 0) {
         perror("open ()");
-        return -1;
+        return -1; /* Error */
     }
 
     free (pipeline->output);
@@ -158,26 +160,38 @@ int job_is_completed (job *j)
 /* Returns:
  * 1, if updated;
  * 0, otherwise. */
-int update_status (job *j, pid_t pid, int status)
+int update_jobs_status (job *j, pid_t pid, int status)
 {
-    process *p = j->first_process;
+    process *p;
 
     if (pid <= 0)
         return 0;
 
-    while (p != NULL) {
-        if (p->pid == pid) {
-            p->status = status;
-            p->stopped = WIFSTOPPED (p->status) ? 1 : 0;
-            p->completed = !p->stopped;
-            return 1;
+    for (; j != NULL; j = j->next) {
+        for (p = j->first_process; p != NULL; p = p->next) {
+            if (p->pid == pid) {
+                if (WIFEXITED (status)) {
+                    p->exit_status = WEXITSTATUS (status);
+                } /* TODO: else */
+                p->stopped = WIFSTOPPED (status) ? 1 : 0;
+                p->completed = (WIFEXITED (status)
+                    || WIFSIGNALED (status)) ? 1 : 0;
+#ifdef RUNNER_DEBUG
+#define STR "Runner: process %d: exit_status: %d, stopped: %d, completed: %d\n"
+                fprintf (stderr, STR, p->pid, p->exit_status,
+                        p->stopped, p->completed);
+#undef STR
+#endif
+                return 1;
+            }
         }
     }
 
     return 0;
 }
 
-/* tmp? */
+/* TODO: tmp? */
+/*
 void wait_for_one_process (pid_t pid, int foreground)
 {
     if (foreground) {
@@ -189,18 +203,29 @@ void wait_for_one_process (pid_t pid, int foreground)
     } while (pid > 0);
 
 }
+*/
 
-/* TODO */
-void wait_for_job (job *j, int foreground)
+/* Blocking until all processes in active job stopped or completed */
+/* TODO: check if background */
+void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
 {
     int status;
     pid_t pid;
 
-    do {
-        pid = wait4 (WAIT_ANY, &status, WUNTRACED, NULL);
-    } while (!update_status (j, pid, status)
-            && !job_is_stopped (j)
-            && !job_is_completed (j));
+    /* if background do nothing */
+    if (!(sinfo->shell_interactive && !foreground)) {
+        /* TODO: setattr */
+
+        do {
+            pid = wait4 (WAIT_ANY, &status, WUNTRACED, NULL);
+            update_jobs_status (sinfo->first_job, pid, status);
+            /*
+            if (active_job == update_process_status (first_job, pid, status))
+                break;
+            */
+        } while (!job_is_stopped (active_job)
+            && !job_is_completed (active_job));
+    } 
 
     /*
     search_by_pid (pid, j, p);
@@ -209,47 +234,61 @@ void wait_for_job (job *j, int foreground)
     */
 }
 
-void change_redirections (shell_info *sinfo, process *p)
+void replace_std_channels (shell_info *sinfo, int fd[2])
 {
-    if (p->infile != STDIN_FILENO) {
+#ifdef RUNNER_DEBUG
+    fprintf (stderr, "Runner: replace_std_channels () with {%d, %d}\n",
+            fd[0], fd[1]);
+#endif
+
+    if (fd[0] != STDIN_FILENO) {
         sinfo->orig_stdin = dup (STDIN_FILENO);
-        dup2 (p->infile, STDIN_FILENO);
-        close (p->infile);
+        dup2 (fd[0], STDIN_FILENO);
+        close (fd[0]);
     }
 
-    if (p->outfile != STDOUT_FILENO) {
+    if (fd[1] != STDOUT_FILENO) {
         sinfo->orig_stdout = dup (STDOUT_FILENO);
-        dup2 (p->outfile, STDOUT_FILENO);
-        close (p->outfile);
+        dup2 (fd[1], STDOUT_FILENO);
+        close (fd[1]);
     }
 }
 
-void unchange_redirections (shell_info *sinfo, process *p)
+void drop_std_channels (shell_info *sinfo, int fd[2])
 {
-    if (p->infile != STDIN_FILENO) {
+#ifdef RUNNER_DEBUG
+    fprintf (stderr, "Runner: drop_std_channels () with {%d, %d}\n",
+            fd[0], fd[1]);
+#endif
+
+    if (fd[0] != STDIN_FILENO) {
         dup2 (sinfo->orig_stdin, STDIN_FILENO);
         close (sinfo->orig_stdin);
         sinfo->orig_stdin = STDIN_FILENO;
     }
 
-    if (p->outfile != STDOUT_FILENO) {
+    if (fd[1] != STDOUT_FILENO) {
         dup2 (sinfo->orig_stdout, STDOUT_FILENO);
         close (sinfo->orig_stdout);
         sinfo->orig_stdout = STDOUT_FILENO;
     }
 }
 
+#define INTERNAL_CMD_RUNNED(run_value) (run_value)
 int run_internal_cmd (process *p)
 {
-    int runned = 0;
+    int run_value = 0;
 
     if (STR_EQUAL (*(p->argv), "cd")) {
-        p->status = run_cd (p);
-        runned = 1;
+        p->exit_status = run_cd (p);
+        run_value = 1;
     }
 
-    return runned;
+    return run_value;
 }
+
+#define SETPGID_ERROR(value) (((value) == -1) ? 1 : 0)
+#define TCSETPGRP_ERROR(value) (((value) == -1) ? 1 : 0)
 
 /* set process group ID
  * set controlling terminal options
@@ -261,13 +300,15 @@ void launch_process (shell_info *sinfo, process *p,
     if (sinfo->shell_interactive) {
         /* set process group ID
          * we must make it before tcsetpgrp */
-        if (setpgid (p->pid, pgid)) {
+        if (SETPGID_ERROR (setpgid (p->pid, pgid))) {
             perror ("(In child process) setpgid");
             exit (1);
         }
 
         /* we must make in before execvp */
-        if (foreground && tcsetpgrp (sinfo->orig_stdin, pgid)) {
+        if (foreground && TCSETPGRP_ERROR (
+                tcsetpgrp (sinfo->orig_stdin, pgid)))
+        {
             perror ("(In child process) tcsetpgrp ()");
             exit (1);
         }
@@ -283,22 +324,45 @@ void launch_process (shell_info *sinfo, process *p,
 #define FORK_ERROR(fork_value) ((fork_value) < 0)
 #define FORK_IS_CHILD(fork_value) ((fork_value) == 0)
 #define FORK_IS_PARENT(fork_value) ((fork_value) > 0)
+#define PIPE_SUCCESS(pipe_value) ((pipe_value) == 0)
+#define PIPE_ERROR(pipe_value) ((pipe_value) == -1)
 
-void launch_job (shell_info *sinfo, job *j, int foreground)
+/* TODO: close pipes */
+void launch_job (shell_info *sinfo, job *j,
+        int foreground)
 {
     process *p;
     pid_t fork_value;
+    int pipefd[2];
+    int cur_fd[2];
 
     for (p = j->first_process; p != NULL; p = p->next) {
-        if (p == j->first_process)
-            p->infile = j->stdin;
-        if (p->next == NULL)
-            p->outfile = j->stdout;
+        /* get input from previous process
+         * or from file (for first process) */
+        cur_fd[0] = (p == j->first_process) ?
+            j->infile : pipefd[0];
 
-        change_redirections (sinfo, p);
+        if (p->next != NULL && PIPE_ERROR (pipe (pipefd))) {
+            perror ("pipe ()");
+            exit (1); /* Or continue work? */
+        }
 
-        if (run_internal_cmd (p)) {
-            unchange_redirections (sinfo, p);
+#ifdef RUNNER_DEBUG
+    fprintf (stderr, "Runner: pipefd: {%d, %d}\n",
+            pipefd[0], pipefd[1]);
+#endif
+
+        /* put output to next process (to pipe)
+         * or to file (for last process) */
+        cur_fd[1] = (p->next == NULL) ?
+            j->outfile : pipefd[1];
+
+        replace_std_channels (sinfo, cur_fd);
+        /* std channels replaced,
+         * cur_fd[0] and cur_fd[1] closed. */
+
+        if (INTERNAL_CMD_RUNNED (run_internal_cmd (p))) {
+            drop_std_channels (sinfo, cur_fd);
             continue;
         }
 
@@ -306,24 +370,21 @@ void launch_job (shell_info *sinfo, job *j, int foreground)
 
         if (FORK_ERROR (fork_value)) {
             perror ("fork");
-            exit (1); /* return? */
+            exit (1); /* Or continue work? */
         }
 
         /* set p->pid ang pgid for both processes */
         if (sinfo->shell_interactive) {
-            if (FORK_IS_PARENT (fork_value)) {
+            if (FORK_IS_PARENT (fork_value))
                 p->pid = fork_value;
-            } else {
+            else
                 p->pid = getpid ();
-            }
 
-            if (p == j->first_process) {
+            if (p == j->first_process)
                 j->pgid = p->pid;
-            }
         }
 
         if (FORK_IS_CHILD (fork_value)) {
-            /* TODO: resolve pipes */
             launch_process (sinfo, p, j->pgid, foreground); /* No return */
         }
 
@@ -331,32 +392,19 @@ void launch_job (shell_info *sinfo, job *j, int foreground)
         if (sinfo->shell_interactive) {
             /* set process group ID
              * we must make it before tcsetpgrp
-             * for job (after this for) */
-            if (setpgid (p->pid, j->pgid))
+             * for job */
+            if (SETPGID_ERROR (setpgid (p->pid, j->pgid))) {
                 perror ("(In child process) setpgid");
+                exit (1);
+            }
         }
 
-        unchange_redirections (sinfo, p);
+        drop_std_channels (sinfo, cur_fd);
     } /* for */
-
-    if (sinfo->shell_interactive) {
-        if (foreground) {
-            /* TODO: setattr */
-            /*wait_for_job (j, foreground);*/
-            wait_for_one_process (j->pgid, foreground);
-        }
-        /* if background do nothing */
-    } else {
-        /* not interactive */
-        /*wait_for_job (j, foreground);*/
-        wait_for_one_process (j->pgid, foreground);
-    }
-
-    /* come back terminal permission */
-    /* TODO: if foreground? */
-    tcsetpgrp (STDIN_FILENO, sinfo->shell_pgid);
 }
 
+/* convert pipeline_item to process,
+ * free pipeline_item */
 process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
 {
     process *p;
@@ -368,62 +416,72 @@ process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
     p->pid = 0; /* Not runned */
     p->completed = 0;
     p->stopped = 0;
-    p->status = 0;
-    p->infile = STDIN_FILENO;
-    p->outfile = STDOUT_FILENO;
+    p->exit_status = 0;
     p->next = NULL;
     return p;
 }
 
-job *pipeline_to_job (cmd_pipeline *pipeline)
+job *make_job ()
 {
     job *j = (job *) malloc (sizeof (job));
-    process *current_item = NULL;
-    cmd_pipeline_item *current_simple_cmd = pipeline->first_item;
-    int tmp_fd;
-
     j->first_process = NULL;
     j->pgid = 0; /* Not runned */
     j->notified = 0;
-    j->stdin = STDIN_FILENO;
-    j->stdout = STDOUT_FILENO;
-    /* j->stderr = STDERR_FILENO; */
+    j->infile = STDIN_FILENO;
+    j->outfile = STDOUT_FILENO;
+    /* j->errfile = STDERR_FILENO; */
     j->next = NULL;
+    return j;
+}
 
-    while (current_simple_cmd != NULL) {
-        if (current_item == NULL) {
-            j->first_process = current_item =
-                pipeline_item_to_process (current_simple_cmd);
+void destroy_job (job *j)
+{
+    process *next;
+    process *p = j->first_process;
+
+    while (p != NULL) {
+        next = p->next;
+        free (p->argv);
+        free (p);
+        p = next;
+    }
+
+    free (j);
+}
+
+job *pipeline_to_job (cmd_pipeline *pipeline)
+{
+    cmd_pipeline_item *scmd = NULL;
+    job *j = make_job ();
+    process *p = NULL;
+
+    for (scmd = pipeline->first_item; scmd != NULL;
+            scmd = scmd->next)
+    {
+        if (p == NULL) {
+            j->first_process = p =
+                pipeline_item_to_process (scmd);
         } else {
-            fprintf (stderr, "Runner: currently pipelines not implemented.\n");
-            return NULL;
-            /*
-            current_item = current_item->next =
-                pipeline_item_to_process (current_simple_cmd);
-            */
+            p = p->next =
+                pipeline_item_to_process (scmd);
         }
-        current_simple_cmd = current_simple_cmd->next;
     }
 
-    /* TODO: maybe, make redirections in child process? */
-    tmp_fd = get_input_fd (pipeline);
-    if (tmp_fd < 0) {
+    /* TODO: maybe, make redirections in child process?
+     * But it will be not works for internal commands */
+
+    j->infile = get_input_fd (pipeline);
+    if (GET_FD_ERROR (j->infile)) {
+        fprintf (stderr, "Runner: bad input file.");
         /* TODO: goto error, free () */
         return NULL;
-    } else if (tmp_fd > 0) {
-        j->stdin = tmp_fd;
-    } else {
-        j->stdin = STDIN_FILENO;
     }
 
-    tmp_fd = get_output_fd (pipeline);
-    if (tmp_fd < 0) {
+    j->outfile = get_output_fd (pipeline);
+    if (GET_FD_ERROR (j->outfile)) {
+        fprintf (stderr, "Runner: bad output file.");
         /* TODO: goto error, free () */
         return NULL;
-    } else if (tmp_fd > 0) {
-        j->stdout = tmp_fd;
-    } else {
-        j->stdout = STDOUT_FILENO;
     }
 
     /* Items already freed in loop */
@@ -431,6 +489,35 @@ job *pipeline_to_job (cmd_pipeline *pipeline)
     free (pipeline);
 
     return j;
+}
+
+void register_job (shell_info *sinfo, job *j)
+{
+    if (sinfo->first_job == NULL)
+        sinfo->last_job = sinfo->first_job = j;
+    else
+        sinfo->last_job = sinfo->last_job->next = j;
+}
+
+void unregister_job (shell_info *sinfo, job *j)
+{
+    job *prev_j = NULL;
+    job *cur_j = sinfo->first_job;
+    job *next_j = NULL;
+
+    while (cur_j != NULL) {
+        next_j = cur_j->next;
+
+        if (cur_j == j) {
+            if (cur_j == sinfo->first_job)
+                sinfo->first_job = next_j;
+            else
+                prev_j->next = next_j;
+        }
+
+        prev_j = cur_j;
+        cur_j = next_j;
+    }
 }
 
 /* TODO */
@@ -449,7 +536,24 @@ void run_cmd_list (shell_info *sinfo, cmd_list *list)
         if (j == NULL)
             return;
 
+        register_job (sinfo, j);
         launch_job (sinfo, j, list->foreground);
+        wait_for_job (sinfo, j, list->foreground);
+        if (job_is_stopped (j)) {
+            unregister_job (sinfo, j);
+            destroy_job (j);
+            j = NULL;
+        }
+
+        /* come back terminal permission */
+        /* TODO: move to wait_for_job */
+        if (sinfo->shell_interactive && list->foreground
+            && TCSETPGRP_ERROR (
+                tcsetpgrp (STDIN_FILENO, sinfo->shell_pgid)))
+        {
+                perror ("(In shell process) tcsetpgrp ()");
+                exit (1);
+        }
 
         /*
         if ((cur_item->rel == REL_NONE)
