@@ -57,7 +57,8 @@ void init_shell (shell_info *sinfo, char **envp)
     sinfo->last_job = NULL;
 
     sinfo->shell_interactive = isatty (sinfo->orig_stdin);
-    tcsetpgrp (sinfo->orig_stdin, sinfo->shell_pgid);
+    if (sinfo->shell_interactive)
+        tcsetpgrp (sinfo->orig_stdin, sinfo->shell_pgid);
 }
 
 void print_prompt1 (void)

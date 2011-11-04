@@ -386,14 +386,15 @@ void launch_job (shell_info *sinfo, job *j,
         }
 
         /* set p->pid ang pgid for both processes */
-        if (sinfo->shell_interactive) {
-            if (FORK_IS_PARENT (fork_value))
-                p->pid = fork_value;
-            else
-                p->pid = getpid ();
+        if (FORK_IS_PARENT (fork_value))
+            p->pid = fork_value;
+        else
+            p->pid = getpid ();
 
-            if (p == j->first_process)
-                j->pgid = p->pid;
+        if (sinfo->shell_interactive
+            && p == j->first_process)
+        {
+            j->pgid = p->pid;
         }
 
         if (FORK_IS_CHILD (fork_value)) {
