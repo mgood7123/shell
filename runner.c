@@ -442,7 +442,6 @@ job *make_job ()
     j->notified = 0;
     j->infile = STDIN_FILENO;
     j->outfile = STDOUT_FILENO;
-    /* j->errfile = STDERR_FILENO; */
     j->next = NULL;
     return j;
 }

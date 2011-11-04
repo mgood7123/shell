@@ -28,7 +28,6 @@ typedef struct job {
  *    Not compiled with it */
     int infile;
     int outfile;
-    /* int errfile; */
     struct job *next;
 } job;
 
@@ -38,9 +37,6 @@ typedef struct shell_info {
     unsigned int shell_interactive:1;
     int orig_stdin;
     int orig_stdout;
-    /* orig_stdin/orig_stdout —
-     * temporally for
-     * change_redirections () */
      job *first_job;
      job *last_job;
     /*job *active_jobs;*/
