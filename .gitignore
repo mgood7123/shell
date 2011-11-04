@@ -1,2 +1,5 @@
 .*.swp
 .vim
+*.o
+shell
+deps.mk
