@@ -1,7 +1,9 @@
-#ifndef _BUFFER_H
-#define _BUFFER_H
+#ifndef BUFFER_H_SENTRY
+#define BUFFER_H_SENTRY
 
-#define BLOCK_SIZE 8
+#ifndef BUFFER_BLOCK_SIZE
+#define BUFFER_BLOCK_SIZE 8
+#endif
 
 typedef struct strblock {
 	struct strblock *next;

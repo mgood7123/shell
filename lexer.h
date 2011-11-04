@@ -1,7 +1,10 @@
-#ifndef _LEXER_H
-#define _LEXER_H
+#ifndef LEXER_H_SENTRY
+#define LEXER_H_SENTRY
 
-/* #define LEXER_DEBUG */
+/* Not defined by default */
+#if !defined(LEXER_DEBUG) && 0
+#define LEXER_DEBUG
+#endif
 
 typedef enum type_of_lex {
     LEX_INPUT,         /* '<'  */

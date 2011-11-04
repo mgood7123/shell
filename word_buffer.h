@@ -1,5 +1,5 @@
-#ifndef _WORD_BUFFER_H
-#define _WORD_BUFFER_H
+#ifndef WORD_BUFFER_H_SENTRY
+#define WORD_BUFFER_H_SENTRY
 
 typedef struct word_item {
 	struct word_item *next;

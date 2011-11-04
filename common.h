@@ -1,5 +1,5 @@
-#ifndef _COMMON_H
-#define _COMMON_H
+#ifndef COMMON_H_SENTRY
+#define COMMON_H_SENTRY
 
 /* for setenv () */
 #define _POSIX_C_SOURCE 200112L

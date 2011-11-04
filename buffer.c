@@ -13,20 +13,20 @@ void new_buffer (buffer *buf)
 
 void add_to_buffer (buffer *buf, char c)
 {
-    int pos = buf->count_sym % BLOCK_SIZE;
+    int pos = buf->count_sym % BUFFER_BLOCK_SIZE;
 
     if (buf->first_block == NULL) {
         buf->last_block = buf->first_block =
             (strblock *) malloc (sizeof (strblock));
         buf->last_block->next = NULL;
         buf->last_block->str =
-            (char *) malloc (sizeof (char) * BLOCK_SIZE);
+            (char *) malloc (sizeof (char) * BUFFER_BLOCK_SIZE);
     } else if (pos == 0) {
         buf->last_block = buf->last_block->next =
             (strblock *) malloc (sizeof (strblock));
         buf->last_block->next = NULL;
         buf->last_block->str =
-            (char *) malloc (sizeof (char) * BLOCK_SIZE);
+            (char *) malloc (sizeof (char) * BUFFER_BLOCK_SIZE);
     }
 
     *(buf->last_block->str + pos) = c;
@@ -63,7 +63,7 @@ char *convert_to_string (buffer *buf, int destroy_me)
         if (next == NULL)
             cur_size = buf->count_sym + str - cur_sym_to;
         else
-            cur_size = BLOCK_SIZE;
+            cur_size = BUFFER_BLOCK_SIZE;
         memcpy (cur_sym_to, current->str, cur_size);
         cur_sym_to += cur_size;
         if (destroy_me) {
@@ -88,7 +88,7 @@ int get_last_from_buffer (buffer *buf)
     if (buf->last_block == NULL)
         return -1;
     return *(buf->last_block->str +
-            ((buf->count_sym - 1) % BLOCK_SIZE));
+            ((buf->count_sym - 1) % BUFFER_BLOCK_SIZE));
 }
 
 /*

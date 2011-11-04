@@ -1,9 +1,12 @@
-#ifndef _RUNNER_H
-#define _RUNNER_H
+#ifndef RUNNER_H_SENTRY
+#define RUNNER_H_SENTRY
 
 #include "common.h"
 
+/* Defined by default */
+#if !defined(RUNNER_DEBUG)
 #define RUNNER_DEBUG
+#endif
 
 typedef struct process {
     char **argv;

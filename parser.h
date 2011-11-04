@@ -1,7 +1,10 @@
-#ifndef _PARSER_H
-#define _PARSER_H
+#ifndef PARSER_H_SENTRY
+#define PARSER_H_SENTRY
 
-/* #define PARSER_DEBUG */
+/* Not defined by default */
+#if !defined(PARSER_DEBUG) && 0
+#define PARSER_DEBUG
+#endif
 
 typedef struct cmd_pipeline_item {
     /* Item data: */
