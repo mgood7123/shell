@@ -234,6 +234,40 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
     */
 }
 
+void save_origin_channels (shell_info *sinfo)
+{
+#ifdef RUNNER_DEBUG
+    fprintf (stderr, "Runner: save_origin_channels ()");
+#endif
+
+    sinfo->orig_stdin = dup (STDIN_FILENO);
+    sinfo->orig_stdout = dup (STDOUT_FILENO);
+
+#ifdef RUNNER_DEBUG
+    fprintf (stderr, " to {%d, %d}\n",
+            sinfo->orig_stdin, sinfo->orig_stdout);
+#endif
+}
+
+void restore_origin_channels (shell_info *sinfo)
+{
+#ifdef RUNNER_DEBUG
+    fprintf (stderr, "Runner: restore_origin_channels () from {%d, %d}\n",
+            sinfo->orig_stdin, sinfo->orig_stdout);
+#endif
+
+    dup2 (sinfo->orig_stdin, STDIN_FILENO);
+    close (sinfo->orig_stdin);
+    sinfo->orig_stdin = STDIN_FILENO;
+
+    dup2 (sinfo->orig_stdout, STDOUT_FILENO);
+    close (sinfo->orig_stdout);
+    sinfo->orig_stdout = STDOUT_FILENO;
+}
+
+/* Replace standart in/out channels,
+ * close fd[0] and fd[1] if it not
+ * original in/out channels. */
 void replace_std_channels (shell_info *sinfo, int fd[2])
 {
 #ifdef RUNNER_DEBUG
@@ -241,36 +275,18 @@ void replace_std_channels (shell_info *sinfo, int fd[2])
             fd[0], fd[1]);
 #endif
 
-    if (fd[0] != STDIN_FILENO) {
-        sinfo->orig_stdin = dup (STDIN_FILENO);
+    if (fd[0] == STDIN_FILENO) {
+        dup2 (sinfo->orig_stdin, STDIN_FILENO);
+    } else {
         dup2 (fd[0], STDIN_FILENO);
         close (fd[0]);
     }
 
-    if (fd[1] != STDOUT_FILENO) {
-        sinfo->orig_stdout = dup (STDOUT_FILENO);
+    if (fd[1] == STDOUT_FILENO) {
+        dup2 (sinfo->orig_stdout, STDOUT_FILENO);
+    } else {
         dup2 (fd[1], STDOUT_FILENO);
         close (fd[1]);
-    }
-}
-
-void drop_std_channels (shell_info *sinfo, int fd[2])
-{
-#ifdef RUNNER_DEBUG
-    fprintf (stderr, "Runner: drop_std_channels () with {%d, %d}\n",
-            fd[0], fd[1]);
-#endif
-
-    if (fd[0] != STDIN_FILENO) {
-        dup2 (sinfo->orig_stdin, STDIN_FILENO);
-        close (sinfo->orig_stdin);
-        sinfo->orig_stdin = STDIN_FILENO;
-    }
-
-    if (fd[1] != STDOUT_FILENO) {
-        dup2 (sinfo->orig_stdout, STDOUT_FILENO);
-        close (sinfo->orig_stdout);
-        sinfo->orig_stdout = STDOUT_FILENO;
     }
 }
 
@@ -327,7 +343,6 @@ void launch_process (shell_info *sinfo, process *p,
 #define PIPE_SUCCESS(pipe_value) ((pipe_value) == 0)
 #define PIPE_ERROR(pipe_value) ((pipe_value) == -1)
 
-/* TODO: close pipes */
 void launch_job (shell_info *sinfo, job *j,
         int foreground)
 {
@@ -348,8 +363,9 @@ void launch_job (shell_info *sinfo, job *j,
         }
 
 #ifdef RUNNER_DEBUG
-    fprintf (stderr, "Runner: pipefd: {%d, %d}\n",
-            pipefd[0], pipefd[1]);
+        if (p->next != NULL)
+            fprintf (stderr, "Runner: pipefd: {%d, %d}\n",
+                    pipefd[0], pipefd[1]);
 #endif
 
         /* put output to next process (to pipe)
@@ -358,13 +374,9 @@ void launch_job (shell_info *sinfo, job *j,
             j->outfile : pipefd[1];
 
         replace_std_channels (sinfo, cur_fd);
-        /* std channels replaced,
-         * cur_fd[0] and cur_fd[1] closed. */
 
-        if (INTERNAL_CMD_RUNNED (run_internal_cmd (p))) {
-            drop_std_channels (sinfo, cur_fd);
+        if (INTERNAL_CMD_RUNNED (run_internal_cmd (p)))
             continue;
-        }
 
         fork_value = fork ();
 
@@ -385,6 +397,9 @@ void launch_job (shell_info *sinfo, job *j,
         }
 
         if (FORK_IS_CHILD (fork_value)) {
+            if (p->next != NULL)
+                close (pipefd[0]); /* used by next process */
+            /* pipefd[1] == cur_fd[1], already closed */
             launch_process (sinfo, p, j->pgid, foreground); /* No return */
         }
 
@@ -398,8 +413,6 @@ void launch_job (shell_info *sinfo, job *j,
                 exit (1);
             }
         }
-
-        drop_std_channels (sinfo, cur_fd);
     } /* for */
 }
 
@@ -537,7 +550,9 @@ void run_cmd_list (shell_info *sinfo, cmd_list *list)
             return;
 
         register_job (sinfo, j);
+        save_origin_channels (sinfo);
         launch_job (sinfo, j, list->foreground);
+        restore_origin_channels (sinfo);
         wait_for_job (sinfo, j, list->foreground);
         if (job_is_stopped (j)) {
             unregister_job (sinfo, j);
