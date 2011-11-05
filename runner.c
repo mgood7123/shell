@@ -7,8 +7,49 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <errno.h>
 
 /* TODO stdin for "read" (by permissions) operations and stdout for "write" */
+
+void register_job (shell_info *sinfo, job *j)
+{
+    if (sinfo->first_job == NULL)
+        sinfo->last_job = sinfo->first_job = j;
+    else
+        sinfo->last_job = sinfo->last_job->next = j;
+}
+
+void unregister_job (shell_info *sinfo, job *j)
+{
+    job *prev_j = NULL;
+    job *cur_j = sinfo->first_job;
+    job *next_j = NULL;
+
+    while (cur_j != NULL) {
+        next_j = cur_j->next;
+
+        if (cur_j == j) {
+#ifdef RUNNER_DEBUG
+            fprintf (stderr, "Runner: unregistered\
+ job with pgid %d.\n", j->pgid);
+#endif
+
+            if (cur_j == sinfo->first_job)
+                sinfo->first_job = next_j;
+            else
+                prev_j->next = next_j;
+
+            if (sinfo->last_job == cur_j)
+            /* if (next_j == NULL) *//* equal conditions */
+                sinfo->last_job = prev_j;
+
+            break;
+        }
+
+        prev_j = cur_j;
+        cur_j = next_j;
+    }
+}
 
 /* Returns:
  * 0, if success.
@@ -162,7 +203,7 @@ int job_is_completed (job *j)
 /* Returns:
  * 1, if updated;
  * 0, otherwise. */
-int update_jobs_status (job *j, pid_t pid, int status)
+int mark_job_status (job *j, pid_t pid, int status)
 {
     process *p;
 
@@ -179,12 +220,12 @@ int update_jobs_status (job *j, pid_t pid, int status)
                 p->completed = (WIFEXITED (status)
                     || WIFSIGNALED (status)) ? 1 : 0;
 #ifdef RUNNER_DEBUG
-#define STR "Runner: process %d: exited: %d,\
- exit_status: %d, stopped: %d, completed: %d\n"
-                fprintf (stderr, STR, p->pid, p->exited,
+                fprintf (stderr,
+"Runner: process %d: exited: %d,\
+ exit_status: %d, stopped: %d, completed: %d\n",
+                        p->pid, p->exited,
                         p->exit_status, p->stopped,
                         p->completed);
-#undef STR
 #endif
                 return 1;
             }
@@ -209,6 +250,9 @@ void wait_for_one_process (pid_t pid, int foreground)
 }
 */
 
+#define SETPGID_ERROR(value) (((value) == -1) ? 1 : 0)
+#define TCSETPGRP_ERROR(value) (((value) == -1) ? 1 : 0)
+
 /* Blocking until all processes in active job stopped or completed */
 /* TODO: check if background */
 void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
@@ -222,23 +266,71 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
 
         do {
             pid = wait4 (WAIT_ANY, &status, WUNTRACED, NULL);
-            if (!update_jobs_status (sinfo->first_job, pid, status)) {
+            if (pid == -1 && errno != ECHILD) {
+                perror ("wait4 ()");
+                exit (1);
+            }
+
+            if (!mark_job_status (sinfo->first_job, pid, status)) {
 #ifdef RUNNER_DEBUG
-#define STR "Job status not updated: pid: %d, status: %d\n"
-                fprintf (stderr, STR, pid, status);
-#undef STR
+                fprintf (stderr,
+"Runner: wait_for_job (): job status not updated:\
+ pid: %d, status: %d\n", pid, status);
 #endif
                 break;
             }
         } while (!job_is_stopped (active_job)
             && !job_is_completed (active_job));
-    } 
+    }
 
-    /*
-    search_by_pid (pid, j, p);
-    pid = wait4 (WAIT_ANY, &(p->status), WUNTRACED, NULL);
-    update_job (j, p);
-    */
+    /* come back terminal permission */
+    if (sinfo->shell_interactive && foreground
+            && TCSETPGRP_ERROR (
+            tcsetpgrp (STDIN_FILENO, sinfo->shell_pgid)))
+    {
+            perror ("(In shell process) tcsetpgrp ()");
+            exit (1);
+    }
+}
+
+/* Update structures without blocking */
+void update_jobs_status (shell_info *sinfo)
+{
+    int status;
+    pid_t pid;
+    job *j;
+
+    do {
+        pid = wait4 (WAIT_ANY, &status, WUNTRACED | WNOHANG, NULL);
+        if (pid == -1 && errno != ECHILD) {
+            perror ("wait4 ()");
+            exit (1);
+        }
+
+        if (!mark_job_status (sinfo->first_job, pid, status)) {
+#ifdef RUNNER_DEBUG
+            fprintf (stderr,
+"Runner: update_jobs_status (): job status not updated:\
+ pid: %d, status: %d\n", pid, status);
+#endif
+            break;
+        }
+
+        for (j = sinfo->first_job; j != NULL; j = j->next) {
+            /* TODO: print some information */
+
+            if (job_is_completed (j)) {
+                fprintf (stderr, "Job with pgid %d completed.\n", j->pgid);
+                unregister_job (sinfo, j);
+                continue;
+            }
+
+            if (job_is_stopped (j)) {
+                fprintf (stderr, "Job with pgid %d stopped.\n", j->pgid);
+                continue;
+            }
+        }
+    } while (1);
 }
 
 void save_origin_channels (shell_info *sinfo)
@@ -309,9 +401,6 @@ int run_internal_cmd (process *p)
 
     return run_value;
 }
-
-#define SETPGID_ERROR(value) (((value) == -1) ? 1 : 0)
-#define TCSETPGRP_ERROR(value) (((value) == -1) ? 1 : 0)
 
 /* set process group ID
  * set controlling terminal options
@@ -517,35 +606,6 @@ job *pipeline_to_job (cmd_pipeline *pipeline)
     return j;
 }
 
-void register_job (shell_info *sinfo, job *j)
-{
-    if (sinfo->first_job == NULL)
-        sinfo->last_job = sinfo->first_job = j;
-    else
-        sinfo->last_job = sinfo->last_job->next = j;
-}
-
-void unregister_job (shell_info *sinfo, job *j)
-{
-    job *prev_j = NULL;
-    job *cur_j = sinfo->first_job;
-    job *next_j = NULL;
-
-    while (cur_j != NULL) {
-        next_j = cur_j->next;
-
-        if (cur_j == j) {
-            if (cur_j == sinfo->first_job)
-                sinfo->first_job = next_j;
-            else
-                prev_j->next = next_j;
-        }
-
-        prev_j = cur_j;
-        cur_j = next_j;
-    }
-}
-
 /* TODO */
 void run_cmd_list (shell_info *sinfo, cmd_list *list)
 {
@@ -567,20 +627,10 @@ void run_cmd_list (shell_info *sinfo, cmd_list *list)
         launch_job (sinfo, j, list->foreground);
         restore_origin_channels (sinfo);
         wait_for_job (sinfo, j, list->foreground);
-        if (job_is_stopped (j)) {
+        if (job_is_completed (j)) {
             unregister_job (sinfo, j);
             destroy_job (j);
             j = NULL;
-        }
-
-        /* come back terminal permission */
-        /* TODO: move to wait_for_job */
-        if (sinfo->shell_interactive && list->foreground
-            && TCSETPGRP_ERROR (
-                tcsetpgrp (STDIN_FILENO, sinfo->shell_pgid)))
-        {
-                perror ("(In shell process) tcsetpgrp ()");
-                exit (1);
         }
 
         /*

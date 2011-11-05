@@ -38,13 +38,14 @@ typedef struct shell_info {
     unsigned int shell_interactive:1;
     int orig_stdin;
     int orig_stdout;
-     job *first_job;
-     job *last_job;
+    job *first_job;
+    job *last_job;
     /*job *active_jobs;*/
 } shell_info;
 
 #include "parser.h"
 void run_cmd_list (shell_info *sinfo,
         cmd_list *list);
+void update_jobs_status (shell_info *sinfo);
 
 #endif

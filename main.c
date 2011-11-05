@@ -125,16 +125,18 @@ int main (int argc, char **argv, char **envp)
     init_parser (&pinfo);
 
     do {
+        update_jobs_status (&sinfo);
         print_prompt1 ();
         list = parse_cmd_list (&pinfo);
 
         switch (pinfo.error) {
         case 0:
+#if 1
             run_cmd_list (&sinfo, list);
-            /*
+#else
             print_cmd_list (stdout, list, 1);
             destroy_cmd_list (list);
-            */
+#endif
             list = NULL;
             break;
         case 16:
