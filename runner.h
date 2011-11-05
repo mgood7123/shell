@@ -37,7 +37,13 @@ typedef struct shell_info {
     pid_t shell_pgid;
     unsigned int shell_interactive:1;
     int orig_stdin;
+    /* == STDIN_FILENO, if standart
+     * input channel not redirected,
+     * != STDIN_FILENO, otherwise.
+     * This values changed by
+     * replace_std_channels (). */
     int orig_stdout;
+    /* Similary with STDOUT_FILENO */
     job *first_job;
     job *last_job;
     /*job *active_jobs;*/

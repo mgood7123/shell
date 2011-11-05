@@ -333,40 +333,11 @@ void update_jobs_status (shell_info *sinfo)
     } while (1);
 }
 
-void save_origin_channels (shell_info *sinfo)
-{
-#ifdef RUNNER_DEBUG
-    fprintf (stderr, "Runner: save_origin_channels ()");
-#endif
-
-    sinfo->orig_stdin = dup (STDIN_FILENO);
-    sinfo->orig_stdout = dup (STDOUT_FILENO);
-
-#ifdef RUNNER_DEBUG
-    fprintf (stderr, " to {%d, %d}\n",
-            sinfo->orig_stdin, sinfo->orig_stdout);
-#endif
-}
-
-void restore_origin_channels (shell_info *sinfo)
-{
-#ifdef RUNNER_DEBUG
-    fprintf (stderr, "Runner: restore_origin_channels () from {%d, %d}\n",
-            sinfo->orig_stdin, sinfo->orig_stdout);
-#endif
-
-    dup2 (sinfo->orig_stdin, STDIN_FILENO);
-    close (sinfo->orig_stdin);
-    sinfo->orig_stdin = STDIN_FILENO;
-
-    dup2 (sinfo->orig_stdout, STDOUT_FILENO);
-    close (sinfo->orig_stdout);
-    sinfo->orig_stdout = STDOUT_FILENO;
-}
-
 /* Replace standart in/out channels,
  * close fd[0] and fd[1] if it not
- * original in/out channels. */
+ * original in/out channels.
+ * Keep sinfo->origin_std* actual,
+ * see comment in typedef shell_info. */
 void replace_std_channels (shell_info *sinfo, int fd[2])
 {
 #ifdef RUNNER_DEBUG
@@ -375,15 +346,35 @@ void replace_std_channels (shell_info *sinfo, int fd[2])
 #endif
 
     if (fd[0] == STDIN_FILENO) {
-        dup2 (sinfo->orig_stdin, STDIN_FILENO);
+        if (sinfo->orig_stdin != STDIN_FILENO) {
+            dup2 (sinfo->orig_stdin, STDIN_FILENO);
+            close (sinfo->orig_stdin);
+
+            /* Mark that std channel not redirected */
+            sinfo->orig_stdin = STDIN_FILENO;
+        }
     } else {
+        /* Keep original channel, if necessary */
+        if (sinfo->orig_stdin == STDIN_FILENO)
+            sinfo->orig_stdin = dup (STDIN_FILENO);
+
         dup2 (fd[0], STDIN_FILENO);
         close (fd[0]);
     }
 
     if (fd[1] == STDOUT_FILENO) {
-        dup2 (sinfo->orig_stdout, STDOUT_FILENO);
+        if (sinfo->orig_stdout != STDOUT_FILENO) {
+            dup2 (sinfo->orig_stdout, STDOUT_FILENO);
+            close (sinfo->orig_stdout);
+
+            /* Mark that std channel not redirected */
+            sinfo->orig_stdout = STDOUT_FILENO;
+        }
     } else {
+        /* Keep original channel, if necessary */
+        if (sinfo->orig_stdout == STDOUT_FILENO)
+            sinfo->orig_stdout = dup (STDOUT_FILENO);
+
         dup2 (fd[1], STDOUT_FILENO);
         close (fd[1]);
     }
@@ -516,6 +507,10 @@ void launch_job (shell_info *sinfo, job *j,
             }
         }
     } /* for */
+
+    cur_fd[0] = STDIN_FILENO;
+    cur_fd[1] = STDOUT_FILENO;
+    replace_std_channels (sinfo, cur_fd);
 }
 
 /* convert pipeline_item to process,
@@ -623,9 +618,7 @@ void run_cmd_list (shell_info *sinfo, cmd_list *list)
             return;
 
         register_job (sinfo, j);
-        save_origin_channels (sinfo);
         launch_job (sinfo, j, list->foreground);
-        restore_origin_channels (sinfo);
         wait_for_job (sinfo, j, list->foreground);
         if (job_is_completed (j)) {
             unregister_job (sinfo, j);
