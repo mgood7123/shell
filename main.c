@@ -46,7 +46,6 @@ void init_shell (shell_info *sinfo, char **envp)
         free (cur_dir);
     }
     umask (S_IWGRP | S_IWOTH);
-    set_sig_ign ();
 
     /* sinfo = (shell_info *) malloc (sizeof (shell_info)); */
     sinfo->envp = envp;
@@ -57,8 +56,10 @@ void init_shell (shell_info *sinfo, char **envp)
     sinfo->last_job = NULL;
 
     sinfo->shell_interactive = isatty (sinfo->orig_stdin);
-    if (sinfo->shell_interactive)
+    if (sinfo->shell_interactive) {
+        set_sig_ign ();
         tcsetpgrp (sinfo->orig_stdin, sinfo->shell_pgid);
+    }
 }
 
 void print_prompt1 (void)

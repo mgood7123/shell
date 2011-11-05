@@ -13,6 +13,7 @@ typedef struct process {
     pid_t pid;
     unsigned int completed:1;
     unsigned int stopped:1;
+    unsigned int exited:1;
     int exit_status;
     /* exit_status correct, if process
      * completed */

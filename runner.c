@@ -157,6 +157,8 @@ int job_is_completed (job *j)
     return 1;
 }
 
+/* TODO: maybe save status, not exited and exit_status? */
+
 /* Returns:
  * 1, if updated;
  * 0, otherwise. */
@@ -170,16 +172,18 @@ int update_jobs_status (job *j, pid_t pid, int status)
     for (; j != NULL; j = j->next) {
         for (p = j->first_process; p != NULL; p = p->next) {
             if (p->pid == pid) {
-                if (WIFEXITED (status)) {
+                p->exited = WIFEXITED (status) ? 1 : 0;
+                if (p->exited)
                     p->exit_status = WEXITSTATUS (status);
-                } /* TODO: else */
                 p->stopped = WIFSTOPPED (status) ? 1 : 0;
                 p->completed = (WIFEXITED (status)
                     || WIFSIGNALED (status)) ? 1 : 0;
 #ifdef RUNNER_DEBUG
-#define STR "Runner: process %d: exit_status: %d, stopped: %d, completed: %d\n"
-                fprintf (stderr, STR, p->pid, p->exit_status,
-                        p->stopped, p->completed);
+#define STR "Runner: process %d: exited: %d,\
+ exit_status: %d, stopped: %d, completed: %d\n"
+                fprintf (stderr, STR, p->pid, p->exited,
+                        p->exit_status, p->stopped,
+                        p->completed);
 #undef STR
 #endif
                 return 1;
@@ -218,11 +222,14 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
 
         do {
             pid = wait4 (WAIT_ANY, &status, WUNTRACED, NULL);
-            update_jobs_status (sinfo->first_job, pid, status);
-            /*
-            if (active_job == update_process_status (first_job, pid, status))
+            if (!update_jobs_status (sinfo->first_job, pid, status)) {
+#ifdef RUNNER_DEBUG
+#define STR "Job status not updated: pid: %d, status: %d\n"
+                fprintf (stderr, STR, pid, status);
+#undef STR
+#endif
                 break;
-            */
+            }
         } while (!job_is_stopped (active_job)
             && !job_is_completed (active_job));
     } 
@@ -311,7 +318,7 @@ int run_internal_cmd (process *p)
  * set job control signals to SIG_DFL
  * exec => no return */
 void launch_process (shell_info *sinfo, process *p,
-        pid_t pgid, int foreground)
+        pid_t pgid, int change_foreground_group)
 {
     if (sinfo->shell_interactive) {
         /* set process group ID
@@ -322,7 +329,8 @@ void launch_process (shell_info *sinfo, process *p,
         }
 
         /* we must make in before execvp */
-        if (foreground && TCSETPGRP_ERROR (
+        if (change_foreground_group
+                && TCSETPGRP_ERROR (
                 tcsetpgrp (sinfo->orig_stdin, pgid)))
         {
             perror ("(In child process) tcsetpgrp ()");
@@ -401,7 +409,11 @@ void launch_job (shell_info *sinfo, job *j,
             if (p->next != NULL)
                 close (pipefd[0]); /* used by next process */
             /* pipefd[1] == cur_fd[1], already closed */
-            launch_process (sinfo, p, j->pgid, foreground); /* No return */
+            launch_process (sinfo, p, j->pgid,
+                    sinfo->shell_interactive
+                    && foreground
+                    && p == j->first_process);
+            /* No return */
         }
 
         /* parent process (here and next) */
@@ -430,6 +442,7 @@ process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
     p->pid = 0; /* Not runned */
     p->completed = 0;
     p->stopped = 0;
+    p->exited = 0;
     p->exit_status = 0;
     p->next = NULL;
     return p;
