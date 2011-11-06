@@ -2,7 +2,7 @@
 #define LEXER_H_SENTRY
 
 /* Not defined by default */
-#if !defined(LEXER_DEBUG) && 0
+#if !defined (LEXER_DEBUG) && 0
 #define LEXER_DEBUG
 #endif
 

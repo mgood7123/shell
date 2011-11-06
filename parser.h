@@ -2,7 +2,7 @@
 #define PARSER_H_SENTRY
 
 /* Not defined by default */
-#if !defined(PARSER_DEBUG) && 0
+#if !defined (PARSER_DEBUG) && 0
 #define PARSER_DEBUG
 #endif
 

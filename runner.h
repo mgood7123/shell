@@ -4,7 +4,7 @@
 #include "common.h"
 
 /* Defined by default */
-#if !defined(RUNNER_DEBUG)
+#if !defined (RUNNER_DEBUG)
 #define RUNNER_DEBUG
 #endif
 
