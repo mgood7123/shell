@@ -9,6 +9,20 @@
 #include <string.h>
 #include <errno.h>
 
+/* Exit status of child process,
+ * if command not found.
+ * 127 is default value for bash. */
+#define ES_EXEC_ERROR 127
+
+/* Exit status, if built-in command found,
+ * but arguments incorrect.
+ * 2 is default value for bash. */
+#define ES_BUILTIN_CMD_UNCORRECT_ARGS 2
+
+/* Exit status, if built-in command found,
+ * but have error during to execute */
+#define ES_BUILTIN_CMD_ERROR 1
+
 /* TODO stdin for "read" (by permissions) operations and stdout for "write" */
 
 void register_job (shell_info *sinfo, job *j)
@@ -51,60 +65,56 @@ void unregister_job (shell_info *sinfo, job *j)
     }
 }
 
-/* Returns:
- * 0, if success.
- * 1, otherwise. */
-int exec_cd (char *str)
-{
-    int status;
-
-    if (str == NULL) {
-        fprintf (stderr, "cd to NULL? No!\n");
-        return 1;
-    }
-
-    status = chdir (str);
-
-    if (status == 0) {
-        /* Change variables */
-        char *oldpwd = getenv ("PWD");
-        char *pwd = getcwd (NULL, 0);
-        setenv ("OLDPWD", oldpwd, 1);
-        setenv ("PWD", pwd, 1);
-        free (pwd);
-    } else {
-        perror ("cd");
-    }
-
-    return status;
-}
-
 #define STR_EQUAL(str1, str2) (strcmp ((str1), (str2)) == 0)
+#define CHDIR_ERROR(chdir_value) ((chdir_value) == -1)
 
+/* Returns:
+ * 0, on success;
+ * non-zero value, otherwise */
 int run_cd (process *p)
 {
     char *new_dir;
     char *arg1 = *(p->argv + 1);
-    int status;
+    int print_new_dir = 0;
+    char *cur_dir = getcwd (NULL, 0);
 
+    /* Resolve new_dir */
     if (arg1 == NULL) {
         new_dir = getenv ("HOME");
+    } else if (*(p->argv + 2) != NULL) {
+        fprintf (stderr, "cd: too many argumens!\n");
+        free (cur_dir);
+        return ES_BUILTIN_CMD_UNCORRECT_ARGS;
     } else if (STR_EQUAL (arg1, "-")) {
         new_dir = getenv ("OLDPWD");
+        print_new_dir = 1;
     } else {
         new_dir = arg1;
     }
 
-    status = exec_cd (new_dir);
-    new_dir = getenv ("PWD"); /* full path */
-
-    if (status == 0) {
-        printf ("%s\n", new_dir);
-    } else {
-        fprintf (stderr, "cd failed.\n");
+    if (new_dir == NULL) {
+        fprintf (stderr, "cd: necessary variable is unset!\n");
+        free (cur_dir);
+        return ES_BUILTIN_CMD_ERROR;
     }
 
-    return status;
+    if (CHDIR_ERROR (chdir (new_dir))) {
+        perror ("chdir ()");
+        free (cur_dir);
+        return ES_BUILTIN_CMD_ERROR;
+    }
+
+    /* Change variables */
+    new_dir = getcwd (NULL, 0); /* get full path */
+    setenv ("OLDPWD", cur_dir, 1);
+    free (cur_dir);
+    setenv ("PWD", new_dir, 1);
+
+    if (print_new_dir)
+        printf ("%s\n", new_dir);
+    free (new_dir);
+
+    return 0;
 }
 
 #define GET_FD_ERROR(get_fd_value) ((get_fd_value) == -1)
@@ -260,7 +270,7 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
     int status;
     pid_t pid;
 
-    /* Not runned or runned only internal commands */
+    /* Not runned or runned only built-in commands */
     if (active_job->pgid == 0)
         return;
 
@@ -380,7 +390,7 @@ void replace_std_channels (shell_info *sinfo, int fd[2])
 
 /* Change p->completed to 1, if cmd runned.
  * Internal cmd can not be stopped or be uncompleted. */
-void try_to_run_internal_cmd (process *p)
+void try_to_run_builtin_cmd (process *p)
 {
     if (STR_EQUAL (*(p->argv), "cd")) {
         p->exit_status = run_cd (p);
@@ -419,7 +429,7 @@ void launch_process (shell_info *sinfo, process *p,
 
     execvp (*(p->argv), p->argv);
     perror ("(In child process) execvp");
-    exit (1);
+    exit (ES_EXEC_ERROR);
 }
 
 #define FORK_ERROR(fork_value) ((fork_value) < 0)
@@ -460,7 +470,7 @@ void launch_job (shell_info *sinfo, job *j,
 
         replace_std_channels (sinfo, cur_fd);
 
-        try_to_run_internal_cmd (p);
+        try_to_run_builtin_cmd (p);
         if (p->completed)
             continue;
 
@@ -536,7 +546,7 @@ job *make_job ()
     j->first_process = NULL;
     j->pgid = 0;
     /* j->pgid == 0 if job not runned
-     * or runned only internal commands */
+     * or runned only built-in commands */
     j->notified = 0;
     j->infile = STDIN_FILENO;
     j->outfile = STDOUT_FILENO;
@@ -578,7 +588,7 @@ job *pipeline_to_job (cmd_pipeline *pipeline)
     }
 
     /* TODO: maybe, make redirections in child process?
-     * But it will be not works for internal commands */
+     * But it will be not works for built-in commands */
 
     j->infile = get_input_fd (pipeline);
     if (GET_FD_ERROR (j->infile)) {
