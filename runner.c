@@ -245,21 +245,6 @@ int mark_job_status (job *j, pid_t pid, int status)
     return 0;
 }
 
-/* TODO: tmp? */
-/*
-void wait_for_one_process (pid_t pid, int foreground)
-{
-    if (foreground) {
-        wait4 (pid, NULL, WUNTRACED, NULL);
-    }
-
-    do {
-        pid = wait4 (WAIT_ANY, NULL, WNOHANG | WUNTRACED, NULL);
-    } while (pid > 0);
-
-}
-*/
-
 #define SETPGID_ERROR(value) (((value) == -1) ? 1 : 0)
 
 /* Blocking until all processes in active job stopped or completed */
