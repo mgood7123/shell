@@ -231,7 +231,7 @@ int mark_job_status (job *j, pid_t pid, int status)
                     || WIFSIGNALED (status)) ? 1 : 0;
 #ifdef RUNNER_DEBUG
                 fprintf (stderr,
-"Runner: process %d: exited: %d,\
+"Runner: mark_job_status(): process %d: exited: %d,\
  exit_status: %d, stopped: %d, completed: %d\n",
                         p->pid, p->exited,
                         p->exit_status, p->stopped,
@@ -309,7 +309,7 @@ void update_jobs_status (shell_info *sinfo)
             break;
 
         for (j = sinfo->first_job; j != NULL; j = j->next) {
-            /* TODO: print some information */
+            /* TODO: print more information */
 
             if (job_is_completed (j)) {
                 fprintf (stderr, "Job with pgid %d completed.\n", j->pgid);
@@ -443,7 +443,7 @@ void launch_job (shell_info *sinfo, job *j,
 
 #ifdef RUNNER_DEBUG
         if (p->next != NULL)
-            fprintf (stderr, "Runner: pipefd: {%d, %d}\n",
+            fprintf (stderr, "Runner: launch_job (): pipefd: {%d, %d}\n",
                     pipefd[0], pipefd[1]);
 #endif
 
@@ -576,14 +576,14 @@ job *pipeline_to_job (cmd_pipeline *pipeline)
 
     j->infile = get_input_fd (pipeline);
     if (GET_FD_ERROR (j->infile)) {
-        fprintf (stderr, "Runner: bad input file.");
+        fprintf (stderr, "Runner: pipeline_to_job (): bad input file.\n");
         /* TODO: goto error, free () */
         return NULL;
     }
 
     j->outfile = get_output_fd (pipeline);
     if (GET_FD_ERROR (j->outfile)) {
-        fprintf (stderr, "Runner: bad output file.");
+        fprintf (stderr, "Runner: pipeline_to_job (): bad output file.\n");
         /* TODO: goto error, free () */
         return NULL;
     }
@@ -602,7 +602,8 @@ void run_cmd_list (shell_info *sinfo, cmd_list *list)
     job *j;
 
     if (list->first_item->rel != REL_NONE) {
-        fprintf (stderr, "Runner: currently command lists not implemented.\n");
+        fprintf (stderr, "Runner: run_cmd_list ():\
+currently command lists not implemented.\n");
         return;
     }
 
