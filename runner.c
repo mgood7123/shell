@@ -260,6 +260,10 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
     int status;
     pid_t pid;
 
+    /* Not runned or runned only internal commands */
+    if (active_job->pgid == 0)
+        return;
+
     /* if background do nothing */
     if (!(sinfo->shell_interactive && !foreground)) {
         /* TODO: setattr */
@@ -307,14 +311,8 @@ void update_jobs_status (shell_info *sinfo)
             exit (1);
         }
 
-        if (!mark_job_status (sinfo->first_job, pid, status)) {
-#ifdef RUNNER_DEBUG
-            fprintf (stderr,
-"Runner: update_jobs_status (): job status not updated:\
- pid: %d, status: %d\n", pid, status);
-#endif
+        if (!mark_job_status (sinfo->first_job, pid, status))
             break;
-        }
 
         for (j = sinfo->first_job; j != NULL; j = j->next) {
             /* TODO: print some information */
@@ -380,17 +378,16 @@ void replace_std_channels (shell_info *sinfo, int fd[2])
     }
 }
 
-#define INTERNAL_CMD_RUNNED(run_value) (run_value)
-int run_internal_cmd (process *p)
+/* Change p->completed to 1, if cmd runned.
+ * Internal cmd can not be stopped or be uncompleted. */
+void try_to_run_internal_cmd (process *p)
 {
-    int run_value = 0;
-
     if (STR_EQUAL (*(p->argv), "cd")) {
         p->exit_status = run_cd (p);
-        run_value = 1;
+        p->stopped = 0;
+        p->completed = 1;
+        p->exited = 1;
     }
-
-    return run_value;
 }
 
 /* set process group ID
@@ -463,7 +460,8 @@ void launch_job (shell_info *sinfo, job *j,
 
         replace_std_channels (sinfo, cur_fd);
 
-        if (INTERNAL_CMD_RUNNED (run_internal_cmd (p)))
+        try_to_run_internal_cmd (p);
+        if (p->completed)
             continue;
 
         fork_value = fork ();
@@ -480,7 +478,7 @@ void launch_job (shell_info *sinfo, job *j,
             p->pid = getpid ();
 
         if (sinfo->shell_interactive
-            && p == j->first_process)
+            && j->pgid == 0)
         {
             j->pgid = p->pid;
         }
@@ -536,7 +534,9 @@ job *make_job ()
 {
     job *j = (job *) malloc (sizeof (job));
     j->first_process = NULL;
-    j->pgid = 0; /* Not runned */
+    j->pgid = 0;
+    /* j->pgid == 0 if job not runned
+     * or runned only internal commands */
     j->notified = 0;
     j->infile = STDIN_FILENO;
     j->outfile = STDOUT_FILENO;
