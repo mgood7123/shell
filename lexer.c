@@ -4,6 +4,8 @@
 #include "common.h"
 #include <stdlib.h>
 
+#define ES_LEXER_INCURABLE_ERROR 1
+
 void print_state (const char *state_name, int c)
 {
     fprintf (stderr, "Lexer: %s; ", state_name);
@@ -180,7 +182,7 @@ lexeme *get_lex (lexer_info *linfo)
             default:
                 fprintf (stderr, "Lexer: error in ST_ONE_SYM_LEX;");
                 print_state ("ST_ONE_SYM_LEX", linfo->c);
-                exit (1);
+                exit (ES_LEXER_INCURABLE_ERROR);
             }
             /* We don't need buffer */
             deferred_get_char (linfo);
@@ -218,7 +220,7 @@ lexeme *get_lex (lexer_info *linfo)
                 default:
                     fprintf (stderr, "Lexer: error (type 1) in ST_ONE_TWO_SYM_LEX;");
                     print_state ("ST_ONE_TWO_SYM_LEX", linfo->c);
-                    exit (1);
+                    exit (ES_LEXER_INCURABLE_ERROR);
                 }
                 if (prev_c == linfo->c)
                     deferred_get_char (linfo);
@@ -227,7 +229,7 @@ lexeme *get_lex (lexer_info *linfo)
             } else {
                 fprintf (stderr, "Lexer: error (type 2) in ST_ONE_TWO_SYM_LEX;");
                 print_state ("ST_ONE_TWO_SYM_LEX", linfo->c);
-                exit (1);
+                exit (ES_LEXER_INCURABLE_ERROR);
             }
             break;
 
@@ -388,16 +390,11 @@ lexeme *get_lex (lexer_info *linfo)
             default:
                 fprintf (stderr, "Lexer: error in ST_EOLN_EOF;");
                 print_state ("ST_EOLN_EOF", linfo->c);
-                exit (1);
+                exit (ES_LEXER_INCURABLE_ERROR);
             }
             deferred_get_char (linfo);
             linfo->state = ST_START;
             return lex;
-
-        default:
-            print_state ("unrecognized state", linfo->c);
-            exit (1);
-            break;
         }
     } while (1);
 }

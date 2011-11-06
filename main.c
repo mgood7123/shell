@@ -45,6 +45,7 @@ void init_shell (shell_info *sinfo, char **envp)
         setenv ("PWD", cur_dir, 1);
         free (cur_dir);
     }
+
     umask (S_IWGRP | S_IWOTH);
 
     /* sinfo = (shell_info *) malloc (sizeof (shell_info)); */
@@ -58,7 +59,11 @@ void init_shell (shell_info *sinfo, char **envp)
     sinfo->shell_interactive = isatty (sinfo->orig_stdin);
     if (sinfo->shell_interactive) {
         set_sig_ign ();
-        tcsetpgrp (sinfo->orig_stdin, sinfo->shell_pgid);
+        if (TCSETPGRP_ERROR (
+                tcsetpgrp (sinfo->orig_stdin, sinfo->shell_pgid)))
+        {
+            exit (ES_SYSCALL_FAILED);
+        }
     }
 }
 

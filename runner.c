@@ -261,7 +261,6 @@ void wait_for_one_process (pid_t pid, int foreground)
 */
 
 #define SETPGID_ERROR(value) (((value) == -1) ? 1 : 0)
-#define TCSETPGRP_ERROR(value) (((value) == -1) ? 1 : 0)
 
 /* Blocking until all processes in active job stopped or completed */
 /* TODO: check if background */
@@ -282,7 +281,7 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
             pid = wait4 (WAIT_ANY, &status, WUNTRACED, NULL);
             if (pid == -1 && errno != ECHILD) {
                 perror ("wait4 ()");
-                exit (1);
+                exit (ES_SYSCALL_FAILED);
             }
 
             if (!mark_job_status (sinfo->first_job, pid, status)) {
@@ -303,7 +302,7 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
             tcsetpgrp (STDIN_FILENO, sinfo->shell_pgid)))
     {
             perror ("(In shell process) tcsetpgrp ()");
-            exit (1);
+            exit (ES_SYSCALL_FAILED);
     }
 }
 
@@ -318,7 +317,7 @@ void update_jobs_status (shell_info *sinfo)
         pid = wait4 (WAIT_ANY, &status, WUNTRACED | WNOHANG, NULL);
         if (pid == -1 && errno != ECHILD) {
             perror ("wait4 ()");
-            exit (1);
+            exit (ES_SYSCALL_FAILED);
         }
 
         if (!mark_job_status (sinfo->first_job, pid, status))
@@ -412,7 +411,7 @@ void launch_process (shell_info *sinfo, process *p,
          * we must make it before tcsetpgrp */
         if (SETPGID_ERROR (setpgid (p->pid, pgid))) {
             perror ("(In child process) setpgid");
-            exit (1);
+            exit (ES_SYSCALL_FAILED);
         }
 
         /* we must make in before execvp */
@@ -421,7 +420,7 @@ void launch_process (shell_info *sinfo, process *p,
                 tcsetpgrp (sinfo->orig_stdin, pgid)))
         {
             perror ("(In child process) tcsetpgrp ()");
-            exit (1);
+            exit (ES_SYSCALL_FAILED);
         }
 
         set_sig_dfl ();
@@ -454,7 +453,7 @@ void launch_job (shell_info *sinfo, job *j,
 
         if (p->next != NULL && PIPE_ERROR (pipe (pipefd))) {
             perror ("pipe ()");
-            exit (1); /* Or continue work? */
+            exit (ES_SYSCALL_FAILED);
         }
 
 #ifdef RUNNER_DEBUG
@@ -478,7 +477,7 @@ void launch_job (shell_info *sinfo, job *j,
 
         if (FORK_ERROR (fork_value)) {
             perror ("fork");
-            exit (1); /* Or continue work? */
+            exit (ES_SYSCALL_FAILED);
         }
 
         /* set p->pid ang pgid for both processes */
@@ -511,7 +510,7 @@ void launch_job (shell_info *sinfo, job *j,
              * for job */
             if (SETPGID_ERROR (setpgid (p->pid, j->pgid))) {
                 perror ("(In child process) setpgid");
-                exit (1);
+                exit (ES_SYSCALL_FAILED);
             }
         }
     } /* for */
