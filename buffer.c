@@ -95,7 +95,7 @@ int get_last_from_buffer (buffer *buf)
 gcc -g -Wall -ansi -pedantic buffer.c -o buffer
 */
 
-/*
+#if 0
 #include <stdio.h>
 #define DEBUG_BUFFER_VAR1
 int main () {
@@ -125,4 +125,4 @@ int main () {
     } while (c != EOF);
     return 0;
 }
-*/
+#endif

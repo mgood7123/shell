@@ -107,7 +107,7 @@ void print_argv (FILE *stream, char **argv)
 gcc -g -Wall -ansi -pedantic word_buffer.c -o word_buffer
 */
 
-/*
+#if 0
 #define DEBUG_WORD_BUFFER_VAR 1
 int main (int argc, char **argv) {
     char **cur_argv;
@@ -127,8 +127,8 @@ int main (int argc, char **argv) {
         my_argv = convert_to_argv (&wbuf, 0);
         print_argv (my_argv);
         printf ("Last string: [%s]\n", get_last_word (&wbuf));
-        / * Use it, only if strings in dynamic memory
-        clear_word_buffer (&wbuf, 1); * /
+        /* Use it, only if strings in dynamic memory
+        clear_word_buffer (&wbuf, 1); */
         clear_word_buffer (&wbuf, 0);
         free (my_argv);
 #elif (DEBUG_WORD_BUFFER_VAR == 2)
@@ -136,18 +136,18 @@ int main (int argc, char **argv) {
         print_argv (my_argv);
         printf ("Last string: [%s]\n", get_last_word (&wbuf));
         clear_word_buffer (&wbuf, 0);
-        / * Use it, only if strings in dynamic memory
-        destroy_argv (my_argv); * /
+        /* Use it, only if strings in dynamic memory
+        destroy_argv (my_argv); */
         free (my_argv);
 #else
         my_argv = convert_to_argv (&wbuf, 1);
         print_argv (my_argv);
-        / * Use it, only if strings in dynamic memory
-        destroy_argv (my_argv); * /
+        /* Use it, only if strings in dynamic memory
+        destroy_argv (my_argv); */
         free (my_argv);
 #endif
     } while (1);
 
     return 0;
 }
-*/
+#endif

@@ -556,7 +556,7 @@ gcc -g -Wall -ansi -pedantic parser.c buffer.o lexer.o word_buffer.o -o parser
 grep -Pn '\* Error \d+ \*' parser.c
 */
 
-/*
+#if 0
 int main ()
 {
     cmd_list *list;
@@ -576,8 +576,8 @@ int main ()
             fprintf (stderr, "Parser: empty command;\n");
             break;
         default:
-            / * TODO: flush read buffer,
-             * possibly via buffer function. * /
+            /* TODO: flush read buffer,
+             * possibly via buffer function. */
             fprintf (stderr, "Parser: bad command;\n");
             break;
         }
@@ -588,4 +588,4 @@ int main ()
 
     return 0;
 }
-*/
+#endif
