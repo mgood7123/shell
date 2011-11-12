@@ -1,8 +1,8 @@
-#include "parser.h"
-
-#include "word_buffer.h"
 #include <stdlib.h>
 #include <stdio.h>
+
+#include "parser.h"
+#include "word_buffer.h"
 
 #ifdef PARSER_DEBUG
 void parser_print_action (parser_info *pinfo, const char *where, int leaving)

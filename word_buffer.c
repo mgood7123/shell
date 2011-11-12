@@ -1,6 +1,6 @@
-#include "word_buffer.h"
-
 #include <stdlib.h>
+
+#include "word_buffer.h"
 
 void new_word_buffer (word_buffer *wbuf)
 {

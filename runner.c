@@ -1,29 +1,5 @@
 #include "runner.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
-#include <errno.h>
-
-/* Exit status of child process,
- * if command not found.
- * 127 is default value for bash. */
-#define ES_EXEC_ERROR 127
-
-/* Exit status, if built-in command found,
- * but arguments incorrect.
- * 2 is default value for bash. */
-#define ES_BUILTIN_CMD_UNCORRECT_ARGS 2
-
-/* Exit status, if built-in command found,
- * but have error during to execute */
-#define ES_BUILTIN_CMD_ERROR 1
-
 /* TODO stdin for "read" (by permissions) operations and stdout for "write" */
 
 void register_job (shell_info *sinfo, job *j)
@@ -65,9 +41,6 @@ void unregister_job (shell_info *sinfo, job *j)
         cur_j = next_j;
     }
 }
-
-#define STR_EQUAL(str1, str2) (strcmp ((str1), (str2)) == 0)
-#define CHDIR_ERROR(chdir_value) ((chdir_value) == -1)
 
 /* Returns:
  * 0, on success;
@@ -117,8 +90,6 @@ int run_cd (process *p)
 
     return 0;
 }
-
-#define GET_FD_ERROR(get_fd_value) ((get_fd_value) == -1)
 
 /* Open file, free pipeline->input.
  * Returns:
@@ -245,8 +216,6 @@ int mark_job_status (job *j, pid_t pid, int status)
 
     return 0;
 }
-
-#define SETPGID_ERROR(value) (((value) == -1) ? 1 : 0)
 
 /* Blocking until all processes in active job stopped or completed */
 /* TODO: check if background */
@@ -416,12 +385,6 @@ void launch_process (shell_info *sinfo, process *p,
     perror ("(In child process) execvp");
     exit (ES_EXEC_ERROR);
 }
-
-#define FORK_ERROR(fork_value) ((fork_value) < 0)
-#define FORK_IS_CHILD(fork_value) ((fork_value) == 0)
-#define FORK_IS_PARENT(fork_value) ((fork_value) > 0)
-#define PIPE_SUCCESS(pipe_value) ((pipe_value) == 0)
-#define PIPE_ERROR(pipe_value) ((pipe_value) == -1)
 
 void launch_job (shell_info *sinfo, job *j,
         int foreground)

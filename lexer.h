@@ -6,6 +6,10 @@
 #define LEXER_DEBUG
 #endif
 
+#define ES_LEXER_INCURABLE_ERROR 1
+
+#include <stdio.h>
+
 typedef enum type_of_lex {
     LEX_INPUT,         /* '<'  */
     LEX_OUTPUT,        /* '>'  */
@@ -54,7 +58,6 @@ void init_lexer (lexer_info *info);
 lexeme *get_lex (lexer_info *info);
 void destroy_lex (lexeme *lex);
 
-#include <stdio.h>
 void print_lex (FILE *stream, lexeme *lex);
 
 #endif

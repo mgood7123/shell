@@ -1,6 +1,9 @@
 #ifndef PARSER_H_SENTRY
 #define PARSER_H_SENTRY
 
+#include <stdio.h>
+#include "lexer.h"
+
 /* Not defined by default */
 #if !defined (PARSER_DEBUG) && 0
 #define PARSER_DEBUG
@@ -44,7 +47,6 @@ typedef struct cmd_list {
     struct cmd_list_item *first_item;
 } cmd_list;
 
-#include "lexer.h"
 typedef struct parser_info {
     lexer_info *linfo;
     lexeme *cur_lex;
@@ -56,7 +58,6 @@ void init_parser (parser_info *pinfo);
 cmd_list *parse_cmd_list (parser_info *pinfo);
 void destroy_cmd_list (cmd_list *list);
 
-#include <stdio.h>
 void print_cmd_list (FILE *stream, cmd_list *list, int newline);
 
 #endif

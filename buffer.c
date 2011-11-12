@@ -1,7 +1,7 @@
-#include "buffer.h"
-
 #include <stdlib.h>
 #include <string.h>
+
+#include "buffer.h"
 
 void new_buffer (buffer *buf)
 {

@@ -1,4 +1,4 @@
-SRCMODULES = buffer.c lexer.c word_buffer.c parser.c runner.c
+SRCMODULES = buffer.c lexer.c word_buffer.c parser.c runner.c utils.c
 OBJMODULES = $(SRCMODULES:.c=.o)
 CFLAGS = -g -Wall -ansi -pedantic
 

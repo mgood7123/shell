@@ -1,6 +1,8 @@
 #ifndef WORD_BUFFER_H_SENTRY
 #define WORD_BUFFER_H_SENTRY
 
+#include <stdio.h>
+
 typedef struct word_item {
 	struct word_item *next;
 	char *str;
@@ -19,7 +21,6 @@ char **convert_to_argv (word_buffer *wbuf, int destroy_me);
 char *get_last_word (word_buffer *wbuf);
 void destroy_argv (char **argv);
 
-#include <stdio.h>
 void print_argv (FILE *stream, char **argv);
 
 #endif

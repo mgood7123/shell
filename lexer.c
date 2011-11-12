@@ -1,10 +1,8 @@
-#include "lexer.h"
-
-#include "buffer.h"
-#include "common.h"
 #include <stdlib.h>
 
-#define ES_LEXER_INCURABLE_ERROR 1
+#include "lexer.h"
+#include "buffer.h"
+#include "utils.h"
 
 void print_state (const char *state_name, int c)
 {
