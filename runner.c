@@ -91,6 +91,19 @@ int run_cd (process *p)
     return 0;
 }
 
+/* Returns:
+ * 0, on success;
+ * non-zero value, otherwise */
+int run_jobs (process *p)
+{
+    if (*(p->argv + 1) != NULL) {
+        fprintf (stderr, "jobs: too many argumens!\n");
+        return ES_BUILTIN_CMD_UNCORRECT_ARGS;
+    }
+
+
+}
+
 /* Open file, free pipeline->input.
  * Returns:
  * fd if all right
@@ -346,8 +359,16 @@ void replace_std_channels (shell_info *sinfo, int fd[2])
  * Internal cmd can not be stopped or be uncompleted. */
 void try_to_run_builtin_cmd (process *p)
 {
-    if (STR_EQUAL (*(p->argv), "cd")) {
+    int runned = 1;
+
+    if (STR_EQUAL (*(p->argv), "cd"))
         p->exit_status = run_cd (p);
+    else if (STR_EQUAL (*(p->argv), "jobs"))
+        p->exit_status = run_jobs (p);
+    else
+        runned = 0;
+
+    if (runned) {
         p->stopped = 0;
         p->completed = 1;
         p->exited = 1;
