@@ -80,7 +80,7 @@ void deferred_get_char (lexer_info *linfo)
 
 void get_char (lexer_info *linfo)
 {
-    linfo->c = getchar();
+    linfo->c = getchar ();
 }
 
 void init_lexer (lexer_info *linfo)
