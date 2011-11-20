@@ -78,3 +78,74 @@ void print_set (char **envp)
         printf ("%s\n", *(envp++));
 }
 */
+
+/* =========== */
+/* Job control */
+
+void register_job (shell_info *sinfo, job *j)
+{
+    if (sinfo->first_job == NULL)
+        sinfo->last_job = sinfo->first_job = j;
+    else
+        sinfo->last_job = sinfo->last_job->next = j;
+}
+
+void unregister_job (shell_info *sinfo, job *j)
+{
+    job *prev_j = NULL;
+    job *cur_j = sinfo->first_job;
+    job *next_j = NULL;
+
+    while (cur_j != NULL) {
+        next_j = cur_j->next;
+
+        if (cur_j == j) {
+            if (cur_j == sinfo->first_job)
+                sinfo->first_job = next_j;
+            else
+                prev_j->next = next_j;
+
+            if (sinfo->last_job == cur_j)
+            /* if (next_j == NULL) *//* equal conditions */
+                sinfo->last_job = prev_j;
+
+            break;
+        }
+
+        prev_j = cur_j;
+        cur_j = next_j;
+    }
+}
+
+
+/* Returns:
+ * 1, if all processes in job stopped;
+ * 0, otherwise. */
+int job_is_stopped (job *j)
+{
+    process *p = j->first_process;
+
+    while (p != NULL) {
+        if (!p->stopped)
+            return 0;
+        p = p->next;
+    }
+
+    return 1;
+}
+
+/* Returns:
+ * 1, if all processes in job completed;
+ * 0, otherwise. */
+int job_is_completed (job *j)
+{
+    process *p = j->first_process;
+
+    while (p != NULL) {
+        if (!p->completed)
+            return 0;
+        p = p->next;
+    }
+
+    return 1;
+}

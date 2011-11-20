@@ -2,44 +2,10 @@
 
 /* TODO stdin for "read" (by permissions) operations and stdout for "write" */
 
-void register_job (shell_info *sinfo, job *j)
+void print_job_status (job *j, const char *status)
 {
-    if (sinfo->first_job == NULL)
-        sinfo->last_job = sinfo->first_job = j;
-    else
-        sinfo->last_job = sinfo->last_job->next = j;
-}
-
-void unregister_job (shell_info *sinfo, job *j)
-{
-    job *prev_j = NULL;
-    job *cur_j = sinfo->first_job;
-    job *next_j = NULL;
-
-    while (cur_j != NULL) {
-        next_j = cur_j->next;
-
-        if (cur_j == j) {
-#ifdef RUNNER_DEBUG
-            fprintf (stderr, "Runner: unregistered\
- job with pgid %d.\n", j->pgid);
-#endif
-
-            if (cur_j == sinfo->first_job)
-                sinfo->first_job = next_j;
-            else
-                prev_j->next = next_j;
-
-            if (sinfo->last_job == cur_j)
-            /* if (next_j == NULL) *//* equal conditions */
-                sinfo->last_job = prev_j;
-
-            break;
-        }
-
-        prev_j = cur_j;
-        cur_j = next_j;
-    }
+     printf ("[pgid: %d] (%s ...): %s\n",
+             j->pgid, j->name, status);
 }
 
 /* Returns:
@@ -94,14 +60,26 @@ int run_cd (process *p)
 /* Returns:
  * 0, on success;
  * non-zero value, otherwise */
-int run_jobs (process *p)
+int run_jobs (shell_info *sinfo, process *p)
 {
+    job *j;
+
     if (*(p->argv + 1) != NULL) {
         fprintf (stderr, "jobs: too many argumens!\n");
         return ES_BUILTIN_CMD_UNCORRECT_ARGS;
     }
 
+    update_jobs_status (sinfo);
 
+    for (j = sinfo->first_job; j != NULL; j = j->next) {
+        if (job_is_stopped (j)) {
+            print_job_status (j, "stopped");
+        } else {
+            print_job_status (j, "runned");
+        }
+    }
+
+    return 0;
 }
 
 /* Open file, free pipeline->input.
@@ -161,38 +139,6 @@ int get_output_fd (cmd_pipeline *pipeline)
     return fd;
 }
 
-/* Returns:
- * 1, if all processes in job stopped;
- * 0, otherwise. */
-int job_is_stopped (job *j)
-{
-    process *p = j->first_process;
-
-    while (p != NULL) {
-        if (!p->stopped)
-            return 0;
-        p = p->next;
-    }
-
-    return 1;
-}
-
-/* Returns:
- * 1, if all processes in job completed;
- * 0, otherwise. */
-int job_is_completed (job *j)
-{
-    process *p = j->first_process;
-
-    while (p != NULL) {
-        if (!p->completed)
-            return 0;
-        p = p->next;
-    }
-
-    return 1;
-}
-
 /* TODO: maybe save status, not exited and exit_status? */
 
 /* Returns:
@@ -214,14 +160,6 @@ int mark_job_status (job *j, pid_t pid, int status)
                 p->stopped = WIFSTOPPED (status) ? 1 : 0;
                 p->completed = (WIFEXITED (status)
                     || WIFSIGNALED (status)) ? 1 : 0;
-#ifdef RUNNER_DEBUG
-                fprintf (stderr,
-"Runner: mark_job_status(): process %d: exited: %d,\
- exit_status: %d, stopped: %d, completed: %d\n",
-                        p->pid, p->exited,
-                        p->exit_status, p->stopped,
-                        p->completed);
-#endif
                 return 1;
             }
         }
@@ -253,11 +191,6 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
             }
 
             if (!mark_job_status (sinfo->first_job, pid, status)) {
-#ifdef RUNNER_DEBUG
-                fprintf (stderr,
-"Runner: wait_for_job (): job status not updated:\
- pid: %d, status: %d\n", pid, status);
-#endif
                 break;
             }
         } while (!job_is_stopped (active_job)
@@ -292,16 +225,14 @@ void update_jobs_status (shell_info *sinfo)
             break;
 
         for (j = sinfo->first_job; j != NULL; j = j->next) {
-            /* TODO: print more information */
-
             if (job_is_completed (j)) {
-                fprintf (stderr, "Job with pgid %d completed.\n", j->pgid);
+                print_job_status (j, "completed");
                 unregister_job (sinfo, j);
                 continue;
             }
 
             if (job_is_stopped (j)) {
-                fprintf (stderr, "Job with pgid %d stopped.\n", j->pgid);
+                print_job_status (j, "stopped");
                 continue;
             }
         }
@@ -315,11 +246,6 @@ void update_jobs_status (shell_info *sinfo)
  * see comment in typedef shell_info. */
 void replace_std_channels (shell_info *sinfo, int fd[2])
 {
-#ifdef RUNNER_DEBUG
-    fprintf (stderr, "Runner: replace_std_channels () with {%d, %d}\n",
-            fd[0], fd[1]);
-#endif
-
     if (fd[0] == STDIN_FILENO) {
         if (sinfo->orig_stdin != STDIN_FILENO) {
             dup2 (sinfo->orig_stdin, STDIN_FILENO);
@@ -357,14 +283,14 @@ void replace_std_channels (shell_info *sinfo, int fd[2])
 
 /* Change p->completed to 1, if cmd runned.
  * Internal cmd can not be stopped or be uncompleted. */
-void try_to_run_builtin_cmd (process *p)
+void try_to_run_builtin_cmd (shell_info *sinfo, process *p)
 {
     int runned = 1;
 
     if (STR_EQUAL (*(p->argv), "cd"))
         p->exit_status = run_cd (p);
     else if (STR_EQUAL (*(p->argv), "jobs"))
-        p->exit_status = run_jobs (p);
+        p->exit_status = run_jobs (sinfo, p);
     else
         runned = 0;
 
@@ -426,12 +352,6 @@ void launch_job (shell_info *sinfo, job *j,
             exit (ES_SYSCALL_FAILED);
         }
 
-#ifdef RUNNER_DEBUG
-        if (p->next != NULL)
-            fprintf (stderr, "Runner: launch_job (): pipefd: {%d, %d}\n",
-                    pipefd[0], pipefd[1]);
-#endif
-
         /* put output to next process (to pipe)
          * or to file (for last process) */
         cur_fd[1] = (p->next == NULL) ?
@@ -439,7 +359,7 @@ void launch_job (shell_info *sinfo, job *j,
 
         replace_std_channels (sinfo, cur_fd);
 
-        try_to_run_builtin_cmd (p);
+        try_to_run_builtin_cmd (sinfo, p);
         if (p->completed)
             continue;
 
@@ -512,11 +432,14 @@ process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
 job *make_job ()
 {
     job *j = (job *) malloc (sizeof (job));
+    j->name = NULL;
     j->first_process = NULL;
     j->pgid = 0;
     /* j->pgid == 0 if job not runned
      * or runned only built-in commands */
-    j->notified = 0;
+
+    /* See comment in typedef */
+    /* j->notified = 0; */
     j->infile = STDIN_FILENO;
     j->outfile = STDOUT_FILENO;
     j->next = NULL;
@@ -550,6 +473,7 @@ job *pipeline_to_job (cmd_pipeline *pipeline)
         if (p == NULL) {
             j->first_process = p =
                 pipeline_item_to_process (scmd);
+            j->name = *(p->argv);
         } else {
             p = p->next =
                 pipeline_item_to_process (scmd);

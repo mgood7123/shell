@@ -1,11 +1,6 @@
 #ifndef RUNNER_H_SENTRY
 #define RUNNER_H_SENTRY
 
-/* Defined by default */
-#if !defined (RUNNER_DEBUG)
-#define RUNNER_DEBUG
-#endif
-
 /* Exit status of child process,
  * if command not found.
  * 127 is default value for bash. */
@@ -50,7 +45,6 @@
 #include <fcntl.h>
 #include <string.h>
 
-#include "utils.h"
 #include "parser.h"
 
 typedef struct process {
@@ -66,12 +60,15 @@ typedef struct process {
 } process;
 
 typedef struct job {
-/*  Need? char *command; */
+    char *name; /* for messages */
     process *first_process;
     pid_t pgid;
+/* Nessessary?
     unsigned int notified:1;
-/*    struct termious tmodes;
- *    Not compiled with it */
+*/
+/* Not compiled with it
+    struct termious tmodes;
+*/
     int infile;
     int outfile;
     struct job *next;
@@ -93,6 +90,8 @@ typedef struct shell_info {
     job *last_job;
     /*job *active_jobs;*/
 } shell_info;
+
+#include "utils.h"
 
 void run_cmd_list (shell_info *sinfo,
         cmd_list *list);
