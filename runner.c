@@ -5,7 +5,7 @@
 void print_job_status (job *j, const char *status)
 {
      printf ("[pgid: %d] (%s ...): %s\n",
-             j->pgid, j->name, status);
+             j->pgid, *(j->first_process->argv), status);
 }
 
 /* Returns:
@@ -432,7 +432,6 @@ process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
 job *make_job ()
 {
     job *j = (job *) malloc (sizeof (job));
-    j->name = NULL;
     j->first_process = NULL;
     j->pgid = 0;
     /* j->pgid == 0 if job not runned
@@ -473,7 +472,6 @@ job *pipeline_to_job (cmd_pipeline *pipeline)
         if (p == NULL) {
             j->first_process = p =
                 pipeline_item_to_process (scmd);
-            j->name = *(p->argv);
         } else {
             p = p->next =
                 pipeline_item_to_process (scmd);

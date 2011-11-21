@@ -60,7 +60,6 @@ typedef struct process {
 } process;
 
 typedef struct job {
-    char *name; /* for messages */
     process *first_process;
     pid_t pgid;
 /* Nessessary?
