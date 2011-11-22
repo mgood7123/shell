@@ -4,8 +4,9 @@
 
 void print_job_status (job *j, const char *status)
 {
-     printf ("[pgid: %d] (%s ...): %s\n",
-             j->pgid, *(j->first_process->argv), status);
+     printf ("[id: %d, pgid: %d] (%s ...): %s\n",
+             j->id, j->pgid,
+             *(j->first_process->argv), status);
 }
 
 /* Returns:
@@ -436,6 +437,8 @@ job *make_job ()
     j->pgid = 0;
     /* j->pgid == 0 if job not runned
      * or runned only built-in commands */
+    j->id = 0;
+    /* j->id == 0, if job not runned */
 
     /* See comment in typedef */
     /* j->notified = 0; */
@@ -502,7 +505,28 @@ job *pipeline_to_job (cmd_pipeline *pipeline)
     return j;
 }
 
-/* TODO */
+/* Choose id, first that not used by other jobs.
+ * Id starts from 1. */
+void choose_job_id (shell_info *sinfo, job *new_job)
+{
+    job *j;
+    int id_in_use;
+
+    new_job->id = 0;
+
+    do {
+        ++(new_job->id);
+        id_in_use = 0;
+        for (j = sinfo->first_job;
+                !id_in_use && j != NULL;
+                j = j->next)
+        {
+            id_in_use = (j->id == new_job->id);
+        }
+    } while (id_in_use);
+}
+
+/* TODO: lists */
 void run_cmd_list (shell_info *sinfo, cmd_list *list)
 {
     cmd_list_item *cur_item = list->first_item;
@@ -519,8 +543,11 @@ currently command lists not implemented.\n");
         if (j == NULL)
             return;
 
-        register_job (sinfo, j);
         launch_job (sinfo, j, list->foreground);
+        choose_job_id (sinfo, j);
+        register_job (sinfo, j);
+        if (sinfo->shell_interactive && !list->foreground)
+            print_job_status (j, "launched in background");
         wait_for_job (sinfo, j, list->foreground);
         if (job_is_completed (j)) {
             unregister_job (sinfo, j);

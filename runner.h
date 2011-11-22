@@ -62,6 +62,7 @@ typedef struct process {
 typedef struct job {
     process *first_process;
     pid_t pgid;
+    int id;
 /* Nessessary?
     unsigned int notified:1;
 */
