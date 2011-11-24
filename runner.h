@@ -30,9 +30,14 @@
 #define FORK_IS_PARENT(fork_value) ((fork_value) > 0)
 #define PIPE_SUCCESS(pipe_value) ((pipe_value) == 0)
 #define PIPE_ERROR(pipe_value) ((pipe_value) == -1)
+#define KILL_ERROR(kill_value) ((kill_value) == -1)
 
 /* for setenv () and wait4 () */
 #define _BSD_SOURCE
+
+/* for kill () */
+#define _POSIX_C_SOURCE 1
+
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/time.h>

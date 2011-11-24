@@ -149,3 +149,13 @@ int job_is_completed (job *j)
 
     return 1;
 }
+
+void mark_job_as_runned (job *j)
+{
+    process *p = j->first_process;
+
+    while (p != NULL) {
+        p->stopped = 0;
+        p = p->next;
+    }
+}

@@ -83,6 +83,75 @@ int run_jobs (shell_info *sinfo, process *p)
     return 0;
 }
 
+void wait_for_job (shell_info *sinfo, job *active_job, int foreground);
+
+/* Returns:
+ * 0, if job continued and (if nessassary) waited
+ * 1, on any errors. */
+int continue_job (shell_info *sinfo, job *j, int foreground)
+{
+    if (sinfo->shell_interactive && foreground
+        && TCSETPGRP_ERROR (
+        tcsetpgrp (sinfo->orig_stdin, j->pgid)))
+    {
+        perror ("tcsetpgrp ()");
+        return 1;
+    }
+
+    if (KILL_ERROR (kill (- j->pgid, SIGCONT))) {
+        perror ("kill (SIGCONT)");
+        return 1;
+    }
+
+    mark_job_as_runned (j);
+
+    if (sinfo->shell_interactive && !foreground)
+        print_job_status (j, "continued in background");
+    wait_for_job (sinfo, j, foreground);
+
+    return 0;
+}
+
+/* Returns:
+ * 0, on success;
+ * non-zero value, otherwise */
+int run_bg_fg (shell_info *sinfo, process *p, int foreground)
+{
+    job *j;
+    int typed_id;
+
+    if (*(p->argv + 2) != NULL) {
+        fprintf (stderr, "bg/fg: too many arguments!\n");
+        return ES_BUILTIN_CMD_UNCORRECT_ARGS;
+    }
+
+    /* Get number of job */
+    if (*(p->argv + 1) == NULL) {
+        typed_id = 0; /* TODO */
+    } else {
+        typed_id = atoi (*(p->argv + 1));
+        /* On all errors atoi returns 0 */
+        /* On "0" also return 0, but it is not a problem:
+         * 0 is not correct job ID */
+    }
+
+    if (typed_id == 0) {
+        fprintf (stderr, "bg/fg: uncorrect argument!\n");
+        return ES_BUILTIN_CMD_UNCORRECT_ARGS;
+    }
+
+    for (j = sinfo->first_job; j != NULL; j = j->next) {
+        if (j->id == typed_id) {
+            if (continue_job (sinfo, j, foreground) != 0)
+                return ES_BUILTIN_CMD_ERROR;
+            return 0;
+        }
+    }
+
+    fprintf (stderr, "bg/fg: job %d not found!\n", typed_id);
+    return ES_BUILTIN_CMD_ERROR;
+}
+
 /* Open file, free pipeline->input.
  * Returns:
  * fd if all right
@@ -170,7 +239,6 @@ int mark_job_status (job *j, pid_t pid, int status)
 }
 
 /* Blocking until all processes in active job stopped or completed */
-/* TODO: check if background */
 void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
 {
     int status;
@@ -180,27 +248,34 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
     if (active_job->pgid == 0)
         return;
 
-    /* if background do nothing */
-    if (!(sinfo->shell_interactive && !foreground)) {
-        /* TODO: setattr */
+    /* Do wait () only if
+     * (shell not interactive || foreground job) */
+    if (sinfo->shell_interactive && !foreground)
+        return;
 
-        do {
-            pid = wait4 (WAIT_ANY, &status, WUNTRACED, NULL);
-            if (pid == -1 && errno != ECHILD) {
-                perror ("wait4 ()");
-                exit (ES_SYSCALL_FAILED);
-            }
+    /* TODO: setattr */
 
-            if (!mark_job_status (sinfo->first_job, pid, status)) {
-                break;
-            }
-        } while (!job_is_stopped (active_job)
-            && !job_is_completed (active_job));
-    }
+    /* wait all processes in job */
+    do {
+        pid = wait4 (WAIT_ANY, &status, WUNTRACED, NULL);
+        if (pid == -1 && errno != ECHILD) {
+            perror ("wait4 ()");
+            exit (ES_SYSCALL_FAILED);
+        }
+
+        if (!mark_job_status (sinfo->first_job, pid, status)) {
+            break;
+        }
+    } while (!job_is_stopped (active_job)
+        && !job_is_completed (active_job));
+
+    /* Do tcsetpgrp () only if
+     * (shell interactive && foreground job) */
+    if (!sinfo->shell_interactive || !foreground)
+        return;
 
     /* come back terminal permission */
-    if (sinfo->shell_interactive && foreground
-            && TCSETPGRP_ERROR (
+    if (TCSETPGRP_ERROR (
             tcsetpgrp (STDIN_FILENO, sinfo->shell_pgid)))
     {
             perror ("(In shell process) tcsetpgrp ()");
@@ -290,8 +365,52 @@ void try_to_run_builtin_cmd (shell_info *sinfo, process *p)
 
     if (STR_EQUAL (*(p->argv), "cd"))
         p->exit_status = run_cd (p);
-    else if (STR_EQUAL (*(p->argv), "jobs"))
+    else
+        runned = 0;
+
+    if (runned) {
+        p->stopped = 0;
+        p->completed = 1;
+        p->exited = 1;
+    }
+}
+
+/* Change j->first_process->completed to 1, if cmd runned or
+ * if pipeline contain more then one cmd. In last case set
+ * j->first_process->exit_status to ES_BUILTIN_CMD_ERROR.
+ * Job control cmd can not be stopped or be uncompleted. */
+void try_to_run_job_control_cmd (shell_info *sinfo, job *j)
+{
+    int runned;
+    process *p = j->first_process;
+
+    if (!STR_EQUAL (*(p->argv), "jobs")
+        && !STR_EQUAL (*(p->argv), "bg")
+        && !STR_EQUAL (*(p->argv), "fg"))
+    {
+        /* This is not job control command */
+        return;
+    }
+
+    if (p->next != NULL) {
+        fprintf (stderr, "Job control command");
+        fprintf (stderr, "can not be runned as");
+        fprintf (stderr, "element of pipeline!\n");
+        p->stopped = 0;
+        p->completed = 1;
+        p->exit_status = ES_BUILTIN_CMD_ERROR;
+        p->exited = 1;
+        return;
+    }
+
+    runned = 1;
+
+    if (STR_EQUAL (*(p->argv), "jobs"))
         p->exit_status = run_jobs (sinfo, p);
+    else if (STR_EQUAL (*(p->argv), "bg"))
+        p->exit_status = run_bg_fg (sinfo, p, 0);
+    else if (STR_EQUAL (*(p->argv), "fg"))
+        p->exit_status = run_bg_fg (sinfo, p, 1);
     else
         runned = 0;
 
@@ -529,7 +648,7 @@ void choose_job_id (shell_info *sinfo, job *new_job)
 /* TODO: lists */
 void run_cmd_list (shell_info *sinfo, cmd_list *list)
 {
-    cmd_list_item *cur_item = list->first_item;
+    cmd_list_item *cur_item;
     job *j;
 
     if (list->first_item->rel != REL_NONE) {
@@ -538,10 +657,22 @@ currently command lists not implemented.\n");
         return;
     }
 
-    do {
+    for (cur_item = list->first_item;
+        cur_item != NULL;
+        cur_item = cur_item->next)
+    {
         j = pipeline_to_job (cur_item->pl);
         if (j == NULL)
             return;
+
+        try_to_run_job_control_cmd (sinfo, j);
+        if (job_is_completed (j) ||
+            j->first_process->exit_status != 0)
+        {
+            destroy_job (j);
+            j = NULL;
+            continue;
+        }
 
         launch_job (sinfo, j, list->foreground);
         choose_job_id (sinfo, j);
@@ -561,7 +692,5 @@ currently command lists not implemented.\n");
             || (cur_item->rel == REL_AND && j->status == 0))
             break;
         */
-
-        cur_item = cur_item->next;
     } while (cur_item != NULL); /* to be on the safe side */
 }
