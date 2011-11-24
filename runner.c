@@ -649,6 +649,8 @@ currently command lists not implemented.\n");
         if (j == NULL)
             return;
 
+        /* We not redirect input/output for
+         * job control commands */
         try_to_run_job_control_cmd (sinfo, j);
         if (job_is_completed (j) ||
             j->first_process->exit_status != 0)
