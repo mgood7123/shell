@@ -180,6 +180,15 @@ void unregister_job (shell_info *sinfo, job *j)
         prev_j = cur_j;
         cur_j = next_j;
     }
+
+    /* Set new current job ID */
+    if (j->id == sinfo->cur_job_id) {
+        if (sinfo->last_job == NULL) {
+            sinfo->cur_job_id = 0;
+        } else {
+            sinfo->cur_job_id = sinfo->last_job->id;
+        }
+    }
 }
 
 

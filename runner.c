@@ -71,12 +71,22 @@ int run_jobs (shell_info *sinfo, process *p)
     }
 
     update_jobs_status (sinfo);
+    printf ("Jobs list:\n");
 
     for (j = sinfo->first_job; j != NULL; j = j->next) {
-        if (job_is_stopped (j)) {
-            print_job_status (j, "stopped");
+
+        if (j->id == sinfo->cur_job_id) {
+            if (job_is_stopped (j)) {
+                print_job_status (j, "stopped; current job");
+            } else {
+                print_job_status (j, "runned; current job");
+            }
         } else {
-            print_job_status (j, "runned");
+            if (job_is_stopped (j)) {
+                print_job_status (j, "stopped");
+            } else {
+                print_job_status (j, "runned");
+            }
         }
     }
 
@@ -228,14 +238,14 @@ int get_output_fd (cmd_pipeline *pipeline)
 /* TODO: maybe save status, not exited and exit_status? */
 
 /* Returns:
- * 1, if updated;
- * 0, otherwise. */
-int mark_job_status (job *j, pid_t pid, int status)
+ * marked job
+ * or NULL, if no job was marked; */
+job *mark_job_status (job *j, pid_t pid, int status)
 {
     process *p;
 
     if (pid <= 0)
-        return 0;
+        return NULL;
 
     for (; j != NULL; j = j->next) {
         for (p = j->first_process; p != NULL; p = p->next) {
@@ -246,12 +256,12 @@ int mark_job_status (job *j, pid_t pid, int status)
                 p->stopped = WIFSTOPPED (status) ? 1 : 0;
                 p->completed = (WIFEXITED (status)
                     || WIFSIGNALED (status)) ? 1 : 0;
-                return 1;
+                return j;
             }
         }
     }
 
-    return 0;
+    return NULL;
 }
 
 /* Blocking until all processes in active job stopped or completed.
@@ -280,7 +290,7 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
             exit (ES_SYSCALL_FAILED);
         }
 
-        if (!mark_job_status (sinfo->first_job, pid, status)) {
+        if (mark_job_status (sinfo->first_job, pid, status) == NULL) {
             break;
         }
         if (job_is_stopped (active_job)) {
@@ -322,20 +332,18 @@ void update_jobs_status (shell_info *sinfo)
             exit (ES_SYSCALL_FAILED);
         }
 
-        if (!mark_job_status (sinfo->first_job, pid, status))
+        j = mark_job_status (sinfo->first_job, pid, status);
+        if (j == NULL)
             break;
 
-        for (j = sinfo->first_job; j != NULL; j = j->next) {
-            if (job_is_completed (j)) {
-                print_job_status (j, "completed");
-                unregister_job (sinfo, j);
-                continue;
-            }
-
-            if (job_is_stopped (j)) {
-                print_job_status (j, "stopped");
-                continue;
-            }
+        if (job_is_completed (j)) {
+            print_job_status (j, "completed");
+            unregister_job (sinfo, j);
+            continue;
+        }
+        if (job_is_stopped (j)) {
+            print_job_status (j, "stopped");
+            continue;
         }
     } while (1);
 }
