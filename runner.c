@@ -95,6 +95,8 @@ int continue_job (shell_info *sinfo, job *j, int foreground)
         tcsetpgrp (sinfo->orig_stdin, j->pgid)))
     {
         perror ("tcsetpgrp ()");
+        fprintf (stderr, "Possibly, typed job already");
+        fprintf (stderr, " completed.\n");
         return 1;
     }
 
@@ -139,6 +141,8 @@ int run_bg_fg (shell_info *sinfo, process *p, int foreground)
         fprintf (stderr, "bg/fg: uncorrect argument!\n");
         return ES_BUILTIN_CMD_UNCORRECT_ARGS;
     }
+
+    update_jobs_status (sinfo);
 
     for (j = sinfo->first_job; j != NULL; j = j->next) {
         if (j->id == typed_id) {
@@ -238,7 +242,8 @@ int mark_job_status (job *j, pid_t pid, int status)
     return 0;
 }
 
-/* Blocking until all processes in active job stopped or completed */
+/* Blocking until all processes in active job stopped or completed.
+ * If active job completed, remove it from list */
 void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
 {
     int status;
@@ -270,7 +275,12 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
             print_job_status (active_job, "stopped");
             break;
         }
-    } while (!job_is_completed (active_job));
+        if (job_is_completed (active_job)) {
+            unregister_job (sinfo, active_job);
+            destroy_job (active_job);
+            break;
+        }
+    } while (1);
 
     /* Do tcsetpgrp () only if
      * (shell interactive && foreground job) */
@@ -533,58 +543,6 @@ void launch_job (shell_info *sinfo, job *j,
     replace_std_channels (sinfo, cur_fd);
 }
 
-/* convert pipeline_item to process,
- * free pipeline_item */
-process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
-{
-    process *p;
-    if (simple_cmd == NULL)
-        return NULL;
-    p = (process *) malloc (sizeof (process));
-    p->argv = simple_cmd->argv;
-    free (simple_cmd);
-    p->pid = 0; /* Not runned */
-    p->completed = 0;
-    p->stopped = 0;
-    p->exited = 0;
-    p->exit_status = 0;
-    p->next = NULL;
-    return p;
-}
-
-job *make_job ()
-{
-    job *j = (job *) malloc (sizeof (job));
-    j->first_process = NULL;
-    j->pgid = 0;
-    /* j->pgid == 0 if job not runned
-     * or runned only built-in commands */
-    j->id = 0;
-    /* j->id == 0, if job not runned */
-
-    /* See comment in typedef */
-    /* j->notified = 0; */
-    j->infile = STDIN_FILENO;
-    j->outfile = STDOUT_FILENO;
-    j->next = NULL;
-    return j;
-}
-
-void destroy_job (job *j)
-{
-    process *next;
-    process *p = j->first_process;
-
-    while (p != NULL) {
-        next = p->next;
-        free (p->argv);
-        free (p);
-        p = next;
-    }
-
-    free (j);
-}
-
 job *pipeline_to_job (cmd_pipeline *pipeline)
 {
     cmd_pipeline_item *scmd = NULL;
@@ -683,11 +641,6 @@ currently command lists not implemented.\n");
         if (sinfo->shell_interactive && !list->foreground)
             print_job_status (j, "launched in background");
         wait_for_job (sinfo, j, list->foreground);
-        if (job_is_completed (j)) {
-            unregister_job (sinfo, j);
-            destroy_job (j);
-            j = NULL;
-        }
 
         /*
         if ((cur_item->rel == REL_NONE)

@@ -82,6 +82,58 @@ void print_set (char **envp)
 /* =========== */
 /* Job control */
 
+/* convert pipeline_item to process,
+ * free pipeline_item */
+process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
+{
+    process *p;
+    if (simple_cmd == NULL)
+        return NULL;
+    p = (process *) malloc (sizeof (process));
+    p->argv = simple_cmd->argv;
+    free (simple_cmd);
+    p->pid = 0; /* Not runned */
+    p->completed = 0;
+    p->stopped = 0;
+    p->exited = 0;
+    p->exit_status = 0;
+    p->next = NULL;
+    return p;
+}
+
+job *make_job ()
+{
+    job *j = (job *) malloc (sizeof (job));
+    j->first_process = NULL;
+    j->pgid = 0;
+    /* j->pgid == 0 if job not runned
+     * or runned only built-in commands */
+    j->id = 0;
+    /* j->id == 0, if job not runned */
+
+    /* See comment in typedef */
+    /* j->notified = 0; */
+    j->infile = STDIN_FILENO;
+    j->outfile = STDOUT_FILENO;
+    j->next = NULL;
+    return j;
+}
+
+void destroy_job (job *j)
+{
+    process *next;
+    process *p = j->first_process;
+
+    while (p != NULL) {
+        next = p->next;
+        free (p->argv);
+        free (p);
+        p = next;
+    }
+
+    free (j);
+}
+
 void register_job (shell_info *sinfo, job *j)
 {
     if (sinfo->first_job == NULL)
