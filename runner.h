@@ -93,7 +93,7 @@ typedef struct shell_info {
     /* Similary with STDOUT_FILENO */
     job *first_job;
     job *last_job;
-    /*job *active_jobs;*/
+    int cur_job_id;
 } shell_info;
 
 #include "utils.h"

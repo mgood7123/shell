@@ -22,15 +22,11 @@ void init_shell (shell_info *sinfo, char **envp)
 
     umask (S_IWGRP | S_IWOTH);
 
-    /* sinfo = (shell_info *) malloc (sizeof (shell_info)); */
+    new_shell_info (sinfo);
     sinfo->envp = envp;
     sinfo->shell_pgid = getpid ();
-    sinfo->orig_stdin = STDIN_FILENO;
-    sinfo->orig_stdout = STDOUT_FILENO;
-    sinfo->first_job = NULL;
-    sinfo->last_job = NULL;
-
     sinfo->shell_interactive = isatty (sinfo->orig_stdin);
+
     if (sinfo->shell_interactive) {
         set_sig_ign ();
         if (TCSETPGRP_ERROR (

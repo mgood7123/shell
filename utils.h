@@ -3,6 +3,7 @@
 
 #include "runner.h"
 
+void new_shell_info (shell_info *sinfo);
 void set_sig_ign (void);
 void set_sig_dfl (void);
 void print_prompt1 (void);

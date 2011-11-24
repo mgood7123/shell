@@ -5,6 +5,19 @@
 
 #include "utils.h"
 
+void new_shell_info (shell_info *sinfo)
+{
+    /* sinfo = (shell_info *) malloc (sizeof (shell_info)); */
+    sinfo->envp = NULL;
+    sinfo->shell_pgid = 0;
+    sinfo->shell_interactive = 0;
+    sinfo->orig_stdin = STDIN_FILENO;
+    sinfo->orig_stdout = STDOUT_FILENO;
+    sinfo->first_job = NULL;
+    sinfo->last_job = NULL;
+    sinfo->cur_job_id = 0;
+}
+
 void set_sig_ign (void)
 {
     signal (SIGINT, SIG_IGN);

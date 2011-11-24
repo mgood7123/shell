@@ -107,8 +107,14 @@ int continue_job (shell_info *sinfo, job *j, int foreground)
 
     mark_job_as_runned (j);
 
-    if (sinfo->shell_interactive && !foreground)
+    if (!sinfo->shell_interactive || foreground)
+        sinfo->cur_job_id = j->id;
+
+    if (sinfo->shell_interactive && !foreground) {
         print_job_status (j, "continued in background");
+    } else {
+        print_job_status (j, "continued in foreground");
+    }
     wait_for_job (sinfo, j, foreground);
 
     return 0;
@@ -129,7 +135,13 @@ int run_bg_fg (shell_info *sinfo, process *p, int foreground)
 
     /* Get number of job */
     if (*(p->argv + 1) == NULL) {
-        typed_id = 0; /* TODO */
+        if (sinfo->cur_job_id == 0) {
+            fprintf (stderr, "bg/fg: shell have not");
+            fprintf (stderr, " current job.\n");
+            return ES_BUILTIN_CMD_UNCORRECT_ARGS;
+        } else {
+            typed_id = sinfo->cur_job_id;
+        }
     } else {
         typed_id = atoi (*(p->argv + 1));
         /* On all errors atoi returns 0 */
@@ -587,7 +599,7 @@ job *pipeline_to_job (cmd_pipeline *pipeline)
 
 /* Choose id, first that not used by other jobs.
  * Id starts from 1. */
-void choose_job_id (shell_info *sinfo, job *new_job)
+void choose_job_id (shell_info *sinfo, job *new_job, int foreground)
 {
     job *j;
     int id_in_use;
@@ -604,6 +616,9 @@ void choose_job_id (shell_info *sinfo, job *new_job)
             id_in_use = (j->id == new_job->id);
         }
     } while (id_in_use);
+
+    if (!sinfo->shell_interactive || foreground)
+        sinfo->cur_job_id = new_job->id;
 }
 
 /* TODO: lists */
@@ -636,7 +651,7 @@ currently command lists not implemented.\n");
         }
 
         launch_job (sinfo, j, list->foreground);
-        choose_job_id (sinfo, j);
+        choose_job_id (sinfo, j, list->foreground);
         register_job (sinfo, j);
         if (sinfo->shell_interactive && !list->foreground)
             print_job_status (j, "launched in background");
