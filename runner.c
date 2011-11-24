@@ -266,8 +266,11 @@ void wait_for_job (shell_info *sinfo, job *active_job, int foreground)
         if (!mark_job_status (sinfo->first_job, pid, status)) {
             break;
         }
-    } while (!job_is_stopped (active_job)
-        && !job_is_completed (active_job));
+        if (job_is_stopped (active_job)) {
+            print_job_status (active_job, "stopped");
+            break;
+        }
+    } while (!job_is_completed (active_job));
 
     /* Do tcsetpgrp () only if
      * (shell interactive && foreground job) */
@@ -394,8 +397,8 @@ void try_to_run_job_control_cmd (shell_info *sinfo, job *j)
 
     if (p->next != NULL) {
         fprintf (stderr, "Job control command");
-        fprintf (stderr, "can not be runned as");
-        fprintf (stderr, "element of pipeline!\n");
+        fprintf (stderr, " can not be runned as");
+        fprintf (stderr, " element of pipeline!\n");
         p->stopped = 0;
         p->completed = 1;
         p->exit_status = ES_BUILTIN_CMD_ERROR;
