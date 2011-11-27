@@ -1,6 +1,4 @@
-#include "runner.h"
-#include "utils.h"
-#include "parser.h"
+#include "main.h"
 
 /* Shell initialization:
  * save envp;
