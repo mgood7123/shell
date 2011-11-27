@@ -359,7 +359,6 @@ lexeme *st_word (lexer_info *linfo, buffer *buf)
         linfo->state = ST_START;
         lex = make_lex (LEX_WORD);
         lex->str = convert_to_string (buf, 1);
-        clear_buffer (buf);
         return lex;
     case '\\':
         deferred_get_char (linfo);
