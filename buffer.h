@@ -16,10 +16,10 @@ typedef struct buffer {
     unsigned int count_sym;
 } buffer;
 
-void new_buffer (buffer *buf);
-void add_to_buffer (buffer *buf, char c);
-void clear_buffer (buffer *buf);
-char *convert_to_string (buffer *buf, int destroy_me);
-int get_last_from_buffer (buffer *buf);
+void new_buffer(buffer *buf);
+void add_to_buffer(buffer *buf, char c);
+void clear_buffer(buffer *buf);
+char *convert_to_string(buffer *buf, int destroy_me);
+int get_last_from_buffer(buffer *buf);
 
 #endif

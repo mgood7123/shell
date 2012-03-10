@@ -14,13 +14,13 @@ typedef struct word_buffer {
     unsigned int count_words;
 } word_buffer;
 
-void new_word_buffer (word_buffer *wbuf);
-void add_to_word_buffer (word_buffer *wbuf, char *str);
-void clear_word_buffer (word_buffer *wbuf, int destroy_str);
-char **convert_to_argv (word_buffer *wbuf, int destroy_me);
-char *get_last_word (word_buffer *wbuf);
-void destroy_argv (char **argv);
+void new_word_buffer(word_buffer *wbuf);
+void add_to_word_buffer(word_buffer *wbuf, char *str);
+void clear_word_buffer(word_buffer *wbuf, int destroy_str);
+char **convert_to_argv(word_buffer *wbuf, int destroy_me);
+char *get_last_word(word_buffer *wbuf);
+void destroy_argv(char **argv);
 
-void print_argv (FILE *stream, char **argv);
+void print_argv(FILE *stream, char **argv);
 
 #endif

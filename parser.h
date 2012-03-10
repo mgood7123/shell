@@ -5,7 +5,7 @@
 #include "lexer.h"
 
 /* Not defined by default */
-#if !defined (PARSER_DEBUG) && 0
+#if !defined(PARSER_DEBUG) && 0
 #define PARSER_DEBUG
 #endif
 
@@ -54,10 +54,10 @@ typedef struct parser_info {
     unsigned int save_str;
 } parser_info;
 
-void init_parser (parser_info *pinfo);
-cmd_list *parse_cmd_list (parser_info *pinfo);
-void destroy_cmd_list (cmd_list *list);
+void init_parser(parser_info *pinfo);
+cmd_list *parse_cmd_list(parser_info *pinfo);
+void destroy_cmd_list(cmd_list *list);
 
-void print_cmd_list (FILE *stream, cmd_list *list, int newline);
+void print_cmd_list(FILE *stream, cmd_list *list, int newline);
 
 #endif

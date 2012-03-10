@@ -16,11 +16,11 @@
 #define ES_BUILTIN_CMD_ERROR 1
 
 /* Exit status, if one of next system calls failed:
- * fork (), pipe (), wait4 (), setpgid (), tcsetpgrp ().
+ * fork(), pipe(), wait4(), setpgid(), tcsetpgrp().
  * Used both in child and shell processes. */
 #define ES_SYSCALL_FAILED 1
 
-#define STR_EQUAL(str1, str2) (strcmp ((str1), (str2)) == 0)
+#define STR_EQUAL(str1, str2) (strcmp((str1), (str2)) == 0)
 #define CHDIR_ERROR(chdir_value) ((chdir_value) == -1)
 #define GET_FD_ERROR(get_fd_value) ((get_fd_value) == -1)
 #define SETPGID_ERROR(setpgid_value) ((setpgid_value) == -1)
@@ -32,10 +32,10 @@
 #define PIPE_ERROR(pipe_value) ((pipe_value) == -1)
 #define KILL_ERROR(kill_value) ((kill_value) == -1)
 
-/* for setenv () and wait4 () */
+/* for setenv() and wait4() */
 #define _BSD_SOURCE
 
-/* for kill () */
+/* for kill() */
 #define _POSIX_C_SOURCE 1
 
 #include <stdlib.h>
@@ -88,7 +88,7 @@ typedef struct shell_info {
      * input channel not redirected,
      * != STDIN_FILENO, otherwise.
      * This values changed by
-     * replace_std_channels (). */
+     * replace_std_channels(). */
     int orig_stdout;
     /* Similary with STDOUT_FILENO */
     job *first_job;
@@ -98,8 +98,8 @@ typedef struct shell_info {
 
 #include "utils.h"
 
-void run_cmd_list (shell_info *sinfo,
+void run_cmd_list(shell_info *sinfo,
         cmd_list *list);
-void update_jobs_status (shell_info *sinfo);
+void update_jobs_status(shell_info *sinfo);
 
 #endif

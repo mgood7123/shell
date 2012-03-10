@@ -2,7 +2,7 @@
 #define LEXER_H_SENTRY
 
 /* Not defined by default */
-#if !defined (LEXER_DEBUG) && 0
+#if !defined(LEXER_DEBUG) && 0
 #define LEXER_DEBUG
 #endif
 
@@ -54,10 +54,10 @@ typedef struct lexer_info {
     unsigned int get_next_char:1;
 } lexer_info;
 
-void init_lexer (lexer_info *info);
-lexeme *get_lex (lexer_info *info);
-void destroy_lex (lexeme *lex);
+void init_lexer(lexer_info *info);
+lexeme *get_lex(lexer_info *info);
+void destroy_lex(lexeme *lex);
 
-void print_lex (FILE *stream, lexeme *lex);
+void print_lex(FILE *stream, lexeme *lex);
 
 #endif

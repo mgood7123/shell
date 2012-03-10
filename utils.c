@@ -5,9 +5,9 @@
 
 #include "utils.h"
 
-void new_shell_info (shell_info *sinfo)
+void new_shell_info(shell_info *sinfo)
 {
-    /* sinfo = (shell_info *) malloc (sizeof (shell_info)); */
+    /* sinfo = (shell_info *) malloc(sizeof(shell_info)); */
     sinfo->envp = NULL;
     sinfo->shell_pgid = 0;
     sinfo->shell_interactive = 0;
@@ -18,77 +18,77 @@ void new_shell_info (shell_info *sinfo)
     sinfo->cur_job_id = 0;
 }
 
-void set_sig_ign (void)
+void set_sig_ign(void)
 {
-    signal (SIGINT, SIG_IGN);
-    signal (SIGQUIT, SIG_IGN);
-    signal (SIGTSTP, SIG_IGN);
-    signal (SIGTTIN, SIG_IGN);
-    signal (SIGTTOU, SIG_IGN);
+    signal(SIGINT, SIG_IGN);
+    signal(SIGQUIT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
+    signal(SIGTTOU, SIG_IGN);
     /* Do not ignore SIGCHLD! If SIGCHLD set to SIG_IGN,
      * waitpid/wait4 behaviour changed, see `man waitpid`.
      * It noted in POSIX.1-2001. */
 }
 
-void set_sig_dfl (void)
+void set_sig_dfl(void)
 {
-    signal (SIGINT, SIG_DFL);
-    signal (SIGQUIT, SIG_DFL);
-    signal (SIGTSTP, SIG_DFL);
-    signal (SIGTTIN, SIG_DFL);
-    signal (SIGTTOU, SIG_DFL);
+    signal(SIGINT, SIG_DFL);
+    signal(SIGQUIT, SIG_DFL);
+    signal(SIGTSTP, SIG_DFL);
+    signal(SIGTTIN, SIG_DFL);
+    signal(SIGTTOU, SIG_DFL);
 }
 
-void print_prompt1 (void)
+void print_prompt1(void)
 {
-    char *ps1 = getenv ("PS1");
-    char *user = getenv ("USER");
-    char *pwd = getenv ("PWD");
+    char *ps1 = getenv("PS1");
+    char *user = getenv("USER");
+    char *pwd = getenv("PWD");
 
     if (ps1) {
-        printf ("%s", ps1);
+        printf("%s", ps1);
         return;
     }
 
     if (user)
-        printf ("%s ", user);
+        printf("%s ", user);
     if (pwd) {
         char *directory;
-        if (strcmp (pwd, "/")) {
+        if (strcmp(pwd, "/")) {
             while (*pwd)
                 if (*(pwd++) == '/')
                     directory = pwd;
         } else
             directory = pwd;
-        printf ("%s ", directory);
+        printf("%s ", directory);
     }
 
     if (user)
-        printf ("%s ", strcmp(user, "root") ? "$" : "#");
+        printf("%s ", strcmp(user, "root") ? "$" : "#");
     else
-        printf ("%s ", "$");
+        printf("%s ", "$");
 }
 
-void print_prompt2 (void)
+void print_prompt2(void)
 {
-    char *ps2 = getenv ("PS2");
+    char *ps2 = getenv("PS2");
 
     if (ps2) {
-        printf ("%s", ps2);
+        printf("%s", ps2);
         return;
     }
 
-    printf ("%s ", ">");
+    printf("%s ", ">");
 }
 
 /*
-void print_set (char **envp)
+void print_set(char **envp)
 {
     if (envp == NULL)
         return;
 
     while (*envp != NULL)
-        printf ("%s\n", *(envp++));
+        printf("%s\n", *(envp++));
 }
 */
 
@@ -97,14 +97,14 @@ void print_set (char **envp)
 
 /* convert pipeline_item to process,
  * free pipeline_item */
-process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
+process *pipeline_item_to_process(cmd_pipeline_item *simple_cmd)
 {
     process *p;
     if (simple_cmd == NULL)
         return NULL;
-    p = (process *) malloc (sizeof (process));
+    p = (process *) malloc(sizeof(process));
     p->argv = simple_cmd->argv;
-    free (simple_cmd);
+    free(simple_cmd);
     p->pid = 0; /* Not runned */
     p->completed = 0;
     p->stopped = 0;
@@ -114,9 +114,9 @@ process *pipeline_item_to_process (cmd_pipeline_item *simple_cmd)
     return p;
 }
 
-job *make_job ()
+job *make_job()
 {
-    job *j = (job *) malloc (sizeof (job));
+    job *j = (job *) malloc(sizeof(job));
     j->first_process = NULL;
     j->pgid = 0;
     /* j->pgid == 0 if job not runned
@@ -132,22 +132,22 @@ job *make_job ()
     return j;
 }
 
-void destroy_job (job *j)
+void destroy_job(job *j)
 {
     process *next;
     process *p = j->first_process;
 
     while (p != NULL) {
         next = p->next;
-        free (p->argv);
-        free (p);
+        free(p->argv);
+        free(p);
         p = next;
     }
 
-    free (j);
+    free(j);
 }
 
-void register_job (shell_info *sinfo, job *j)
+void register_job(shell_info *sinfo, job *j)
 {
     if (sinfo->first_job == NULL)
         sinfo->last_job = sinfo->first_job = j;
@@ -155,7 +155,7 @@ void register_job (shell_info *sinfo, job *j)
         sinfo->last_job = sinfo->last_job->next = j;
 }
 
-void unregister_job (shell_info *sinfo, job *j)
+void unregister_job(shell_info *sinfo, job *j)
 {
     job *prev_j = NULL;
     job *cur_j = sinfo->first_job;
@@ -195,7 +195,7 @@ void unregister_job (shell_info *sinfo, job *j)
 /* Returns:
  * 1, if all processes in job stopped;
  * 0, otherwise. */
-int job_is_stopped (job *j)
+int job_is_stopped(job *j)
 {
     process *p = j->first_process;
 
@@ -211,7 +211,7 @@ int job_is_stopped (job *j)
 /* Returns:
  * 1, if all processes in job completed;
  * 0, otherwise. */
-int job_is_completed (job *j)
+int job_is_completed(job *j)
 {
     process *p = j->first_process;
 
@@ -224,7 +224,7 @@ int job_is_completed (job *j)
     return 1;
 }
 
-void mark_job_as_runned (job *j)
+void mark_job_as_runned(job *j)
 {
     process *p = j->first_process;
 
