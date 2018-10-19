@@ -401,7 +401,7 @@ error:
 
 cmd_list_item *parse_cmd_list_item(parser_info *pinfo)
 {
-    cmd_list_item *list_item = make_cmd_list_item();
+    cmd_list_item *list_item = make_cmd_list_item(); /* marked */
 
 #ifdef PARSER_DEBUG
     parser_print_action(pinfo, "parse_cmd_list_item()", 0);
@@ -475,7 +475,7 @@ cmd_list *parse_cmd_list(parser_info *pinfo)
     }
 
     do {
-        tmp_item = parse_cmd_list_item(pinfo);
+        tmp_item = parse_cmd_list_item(pinfo); /* marked */
         if (pinfo->error)
             goto error;
 
@@ -551,12 +551,12 @@ error:
 gcc -g -Wall -ansi -pedantic -c buffer.c -o buffer.o &&
 gcc -g -Wall -ansi -pedantic -c lexer.c -o lexer.o &&
 gcc -g -Wall -ansi -pedantic -c word_buffer.c -o word_buffer.o &&
-gcc -g -Wall -ansi -pedantic parser.c buffer.o lexer.o word_buffer.o -o parser
+gcc -g -Wall -ansi -pedantic parser.c buffer.o lexer.o word_buffer.o utils.o -o parser
  * Grep possible parsing errors:
 grep -Pn '\* Error \d+ \*' parser.c
 */
 
-#if 0
+#ifdef PARSER
 int main()
 {
     cmd_list *list;
@@ -564,11 +564,11 @@ int main()
     init_parser(&pinfo);
 
     do {
-        list = parse_cmd_list(&pinfo);
+        list = parse_cmd_list(&pinfo); /* marked */
 
         switch (pinfo.error) {
         case 0:
-            print_cmd_list(stdout, list, 1);
+            print_cmd_list(stdout, list, 1); /* marked */
             destroy_cmd_list(list);
             list = NULL;
             break;

@@ -30,6 +30,7 @@ void add_to_buffer(buffer *buf, char c)
     }
 
     *(buf->last_block->str + pos) = c;
+	*(buf->last_block->str + pos +1) = 0;
     ++(buf->count_sym);
 }
 

@@ -5,9 +5,7 @@
 #include "lexer.h"
 
 /* Not defined by default */
-#if !defined(PARSER_DEBUG) && 0
 #define PARSER_DEBUG
-#endif
 
 typedef struct cmd_pipeline_item {
     /* Item data: */

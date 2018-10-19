@@ -1,0 +1,38 @@
+* Go through perror: where you need to exit after it, where return is -1. Look not
+* Is checking for errors forgotten anywhere?
+
+* Check dup2 for errors.
+
+* Formatting. Tabs / spaces. Long lines.
+
+* Parser: select input, output and append from cmd_pipeline_item into a separate structure.
+
+* Runner: it is logical to open files immediately before the launch of the next conveyor.
+
+* Runner: storing open handles in some special storage. AT
+* in case of an unsuccessfully complete command - to close exactly those descriptors that
+* must be closed. Hmm ... well, actually the structure itself with the job is something
+* storage is.
+
+* Parser: & shared lists.
+
+* Buffer: option with buffer not with list, but with expanding array. Include
+* by define.
+
+* Runner: Do you push redirects into a child process?
+
+* Runner: Do I need tcsetpgrp () in the shell process?
+
+* Parser: and not to put in order the structure of teams, reducing their number? Still
+* it would be nice to remove the re-conversion into your own structures in the runner — and
+* figs with it, that at some of the stages of the fields of the structure will not
+* used in principle. Or, alternatively, still leave
+* conversion, but the number of parser structures is still reduced.
+
+* Runner: add var_set, var_unset.
+
+* $ echo 111 `echo"> 222 "`
+* 111> 222
+* Leave space in argv, then fill.
+
+* Remove * .core with make clean, carefully see the Makefile.

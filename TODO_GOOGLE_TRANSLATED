@@ -1,0 +1,78 @@
+THE TASK OF THE WORKSHOP "Model Shell-interpreter"
+
+It is proposed to implement an interactive command under the Unix OS
+interpreter looping through the command line
+standard input, analysis and execution of relevant actions.
+The task is carried out in several stages.
+
+   1) Write a program that performs a loop reading lines from the standard
+input and dividing lines into separate words. Any number reaching
+consecutive whitespace characters are treated the same as one space.
+Text enclosed in double quotes is treated as one word or
+part of the word, i.e. double quotes inside whitespace
+are treated as ordinary characters. For example:
+
+   > aaa "bbb ccc" ddd
+   aaa
+   bbb ccc
+   ddd
+
+   > aaaa "bbb" ccc "ddd" eee
+   aaaa
+   bbbcccddd
+   eee
+
+Strings of arbitrary length are allowed, i.e. the program should behave
+correctly regardless of how long the string is fed to the input (!).
+The program terminates in the "end of file" situation on the standard input.
+Processing the end of the file must be implemented correctly.
+
+Requirement to the code: in the program after reading the next line should
+_list_ of words received, and only after this word
+must be displayed on the screen to demonstrate correct operation.
+
+   2) Call external commands. Modify the program so that
+she perceived the first word she received as the name of a team, the rest as
+command parameters and executed the commands entered (programs,
+located on the disk in the directories listed in the PATH variable, or
+indicated by full name). Supplement the program with built-in command cd
+to change the current directory.
+
+   3) Modify the read subroutine (1st stage) so that
+she perceived the character '&' (if it was greeted with _quite_ quotes) as
+separator character (i.e. a character that is a separate word itself
+by oneself). Implement command execution in the background. Run in
+background command, the last word in which is the character '&'.
+If the '&' character is not found at the end, give an error message. By
+the completion of the command that was running in the background, to issue a message about
+its completion and completion code.
+
+   4) Modify the read routine so that the characters '|'
+and, depending on the variant, the symbol '<', '>' or '>>' was perceived as
+dividing. Implement one of three I / O redirections
+(depending on the option).
+
+   5) Implement the launch of commands by the pipeline. In the minimum version
+it is enough to implement a pipeline of two commands, if available in the command
+a string of more than one '|' give an error message.
+In the full version of the restrictions on the length of the conveyor should not be.
+
+
+
+               -----------------------------------------
+
+As a supplement to the main part (at the request of the teacher)
+implement:
+  - a bunch of ';' (one command is executed first, then the second)
+  - a bunch of '||' (the first command is executed first, and if
+failed, then run the second team)
+  - a bunch of '&&' (the first command is executed first, and if it is
+completed successfully, the second command is executed)
+  - parentheses (the contents of the brackets, having an arbitrary complexity,
+executed as a single command). This opportunity can be chosen
+only with one of the three previous ones, otherwise impossible
+check its availability.
+  - reverse apostrophes (substitution of the result of the command execution).
+  - view and modify the variable PATH
+
+Where: http://al.cs.msu.su/static/classes/prac_shell.txt

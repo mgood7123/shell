@@ -1,0 +1,24 @@
+cc -MM buffer.c lexer.c word_buffer.c parser.c runner.c utils.c main.c buffer.h lexer.h word_buffer.h parser.h runner.h utils.h main.h > deps.mk
+cc -g -Wall -ansi -pedantic  -c buffer.c -o buffer.o
+cc -g -Wall -ansi -pedantic  -c lexer.c -o lexer.o
+cc -g -Wall -ansi -pedantic  -c word_buffer.c -o word_buffer.o
+cc -g -Wall -ansi -pedantic  -c parser.c -o parser.o
+cc -g -Wall -ansi -pedantic  -c runner.c -o runner.o
+In file included from /usr/include/x86_64-linux-gnu/bits/libc-header-start.h:33:0,
+                 from /usr/include/stdlib.h:25,
+                 from runner.h:41,
+                 from runner.c:1:
+/usr/include/features.h:184:3: warning: #warning "_BSD_SOURCE and _SVID_SOURCE are deprecated, use _DEFAULT_SOURCE" [-Wcpp]
+ # warning "_BSD_SOURCE and _SVID_SOURCE are deprecated, use _DEFAULT_SOURCE"
+   ^~~~~~~
+cc -g -Wall -ansi -pedantic  -c utils.c -o utils.o
+cc -g -Wall -ansi -pedantic  -c main.c -o main.o
+In file included from /usr/include/x86_64-linux-gnu/bits/libc-header-start.h:33:0,
+                 from /usr/include/stdlib.h:25,
+                 from runner.h:41,
+                 from main.h:4,
+                 from main.c:1:
+/usr/include/features.h:184:3: warning: #warning "_BSD_SOURCE and _SVID_SOURCE are deprecated, use _DEFAULT_SOURCE" [-Wcpp]
+ # warning "_BSD_SOURCE and _SVID_SOURCE are deprecated, use _DEFAULT_SOURCE"
+   ^~~~~~~
+cc -g -Wall -ansi -pedantic  buffer.o lexer.o word_buffer.o parser.o runner.o utils.o main.o -o shell
